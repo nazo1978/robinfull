@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Next.js uygulaması
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=${REDIS_URL}
+      - REDIS_TOKEN=${REDIS_TOKEN}
+      - MONGODB_URI=mongodb://mongodb:27017/ShopAppDb
+    depends_on:
+      - redis
+      - mongodb
+    networks:
+      - robinhoot-network
+
+  # Redis önbellek
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - robinhoot-network
+      
+  # MongoDB veritabanı
+  mongodb:
+    image: mongo:7.0
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=ShopAppDb
+    networks:
+      - robinhoot-network
+
+  # Nginx yük dengeleyici
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - app
+    networks:
+      - robinhoot-network
+
+networks:
+  robinhoot-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  mongodb-data:

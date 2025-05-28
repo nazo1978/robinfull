@@ -1,0 +1,13 @@
+Veritabanı değişikliklerini uygulamak için aşağıdaki komutları çalıştırabilirsiniz:
+
+1. Migration oluşturma:
+```
+dotnet ef migrations add AddDiscountAndUpdateAuctionSystem --project ShopApp.Persistence --startup-project ShopApp.WebApi
+```
+
+2. Veritabanını güncelleme:
+```
+dotnet ef database update --project ShopApp.Persistence --startup-project ShopApp.WebApi
+```
+
+Bu komutlar, oluşturduğumuz indirim sistemi ve güncellediğimiz açık artırma sistemi için gerekli veritabanı değişikliklerini uygulayacaktır.
