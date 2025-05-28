@@ -55,7 +55,7 @@ public class JwtHelper : IJwtHelper
             issuer: tokenOptions.Issuer,
             audience: tokenOptions.Audience,
             expires: _accessTokenExpiration,
-            notBefore: DateTime.Now,
+            notBefore: DateTime.UtcNow,
             claims: SetClaims(user),
             signingCredentials: signingCredentials
         );

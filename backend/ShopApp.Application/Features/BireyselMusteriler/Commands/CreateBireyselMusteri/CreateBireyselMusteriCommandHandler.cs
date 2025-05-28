@@ -56,7 +56,7 @@ public class CreateBireyselMusteriCommandHandler : IRequestHandler<CreateBireyse
         bireyselMusteri.PasswordHash = passwordHash;
         bireyselMusteri.PasswordSalt = passwordSalt;
         bireyselMusteri.EmailConfirmed = false;
-        bireyselMusteri.LastLoginDate = DateTime.Now;
+        bireyselMusteri.LastLoginDate = DateTime.UtcNow;
         bireyselMusteri.IsActive = true;
         bireyselMusteri.IsDeleted = false;
 
@@ -65,11 +65,15 @@ public class CreateBireyselMusteriCommandHandler : IRequestHandler<CreateBireyse
         bireyselMusteri.LastName = request.Soyad;
         bireyselMusteri.PhoneNumber = request.Telefon;
         bireyselMusteri.Address = request.Adres;
-        bireyselMusteri.RegistrationDate = DateTime.Now;
+        bireyselMusteri.RegistrationDate = DateTime.UtcNow;
+        bireyselMusteri.UserType = "BireyselMusteri";
 
         // Müşteri alanlarını doldur
-        bireyselMusteri.KayitTarihi = DateTime.Now;
+        bireyselMusteri.KayitTarihi = DateTime.UtcNow;
         bireyselMusteri.AktifMi = true;
+
+        // DogumTarihi'ni UTC olarak ayarla
+        bireyselMusteri.DogumTarihi = DateTime.SpecifyKind(request.DogumTarihi, DateTimeKind.Utc);
 
         // Veritabanına kaydet
         await _bireyselMusteriRepository.AddAsync(bireyselMusteri);

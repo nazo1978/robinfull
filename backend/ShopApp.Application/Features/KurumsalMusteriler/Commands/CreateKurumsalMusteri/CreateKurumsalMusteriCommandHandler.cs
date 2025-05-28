@@ -56,19 +56,22 @@ public class CreateKurumsalMusteriCommandHandler : IRequestHandler<CreateKurumsa
         kurumsalMusteri.PasswordHash = passwordHash;
         kurumsalMusteri.PasswordSalt = passwordSalt;
         kurumsalMusteri.EmailConfirmed = false;
-        kurumsalMusteri.LastLoginDate = DateTime.Now;
+        kurumsalMusteri.LastLoginDate = DateTime.UtcNow;
         kurumsalMusteri.IsActive = true;
         kurumsalMusteri.IsDeleted = false;
+        kurumsalMusteri.CreatedDate = DateTime.UtcNow;
+        kurumsalMusteri.ModifiedDate = DateTime.UtcNow;
 
         // ApplicationUser alanlarını doldur
         kurumsalMusteri.FirstName = request.Ad;
         kurumsalMusteri.LastName = request.Soyad;
         kurumsalMusteri.PhoneNumber = request.Telefon;
         kurumsalMusteri.Address = request.Adres;
-        kurumsalMusteri.RegistrationDate = DateTime.Now;
+        kurumsalMusteri.RegistrationDate = DateTime.UtcNow;
+        kurumsalMusteri.UserType = "KurumsalMusteri";
 
         // Müşteri alanlarını doldur
-        kurumsalMusteri.KayitTarihi = DateTime.Now;
+        kurumsalMusteri.KayitTarihi = DateTime.UtcNow;
         kurumsalMusteri.AktifMi = true;
 
         // Veritabanına kaydet

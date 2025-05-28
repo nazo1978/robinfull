@@ -13,6 +13,7 @@ using ShopApp.Core.CrossCuttingConcerns.Exceptions.Extensions;
 using ShopApp.Core.Security.JWT;
 using ShopApp.Persistence;
 using ShopApp.WebApi.Hubs;
+using ShopApp.WebApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -68,6 +69,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Configure global exception middleware
+app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 
 // Configure custom exception middleware
 app.ConfigureCustomExceptionMiddleware();
