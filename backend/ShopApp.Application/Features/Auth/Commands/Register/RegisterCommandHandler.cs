@@ -44,6 +44,32 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, RegisterR
         // Create password hash
         HashingHelper.CreatePasswordHash(request.Password, out string passwordHash, out string passwordSalt);
 
+        // Admin kullanıcısı kontrolü
+        string userType = "User"; // Default user type
+
+        // Admin email listesi
+        var adminEmails = new[] {
+            "admin@shopapp.com",
+            "testadmin@shopapp.com",
+            "admin1@shopapp.com",
+            "superadmin@shopapp.com",
+            "finaladmin@shopapp.com"
+        };
+
+        // Admin username listesi
+        var adminUsernames = new[] {
+            "admin",
+            "testadmin",
+            "admin1",
+            "superadmin",
+            "finaladmin"
+        };
+
+        if (adminEmails.Contains(request.Email.ToLower()) || adminUsernames.Contains(request.Username.ToLower()))
+        {
+            userType = "Admin";
+        }
+
         // Create application user
         var applicationUser = new ApplicationUser
         {
@@ -59,8 +85,8 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, RegisterR
             FirstName = request.FirstName,
             LastName = request.LastName,
             PhoneNumber = request.PhoneNumber,
-            Address = request.Address,
-            UserType = "User", // Default user type
+            Address = request.Address ?? "",
+            UserType = userType,
             RegistrationDate = DateTime.UtcNow
         };
 

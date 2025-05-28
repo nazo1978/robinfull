@@ -14,9 +14,15 @@ public static class RoleClaimHelper
         claims.Add(new Claim(ClaimTypes.Role, Role.User));
 
         // ApplicationUser ise Customer rolü ekle
-        if (user is ApplicationUser)
+        if (user is ApplicationUser appUser)
         {
             claims.Add(new Claim(ClaimTypes.Role, Role.Customer));
+
+            // UserType kontrolü - Admin kullanıcıları
+            if (!string.IsNullOrEmpty(appUser.UserType) && appUser.UserType == "Admin")
+            {
+                claims.Add(new Claim(ClaimTypes.Role, Role.Admin));
+            }
 
             // Bireysel veya Kurumsal müşteri kontrolü
             // Tip kontrolü yerine kullanıcı adı veya email üzerinden kontrol yapabiliriz
@@ -31,7 +37,7 @@ public static class RoleClaimHelper
             }
         }
 
-        // Admin kontrolü (örnek olarak, gerçek uygulamada veritabanından kontrol edilebilir)
+        // Fallback admin kontrolü (username bazlı)
         if (user.Username == "admin")
         {
             claims.Add(new Claim(ClaimTypes.Role, Role.Admin));

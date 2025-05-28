@@ -21,19 +21,19 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
 
     public async Task<LoginResponse> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
-        var user = await _userRepository.GetByUsernameAsync(request.Username, cancellationToken);
-        
+        var user = await _userRepository.GetByEmailAsync(request.Email, cancellationToken);
+
         if (user == null)
-            throw new BusinessException("User not found");
-            
+            throw new BusinessException("Email or password is incorrect");
+
         if (!HashingHelper.VerifyPasswordHash(request.Password, user.PasswordHash, user.PasswordSalt))
             throw new BusinessException("Password is incorrect");
-            
+
         if (!user.IsActive)
             throw new BusinessException("User is not active");
-            
+
         var token = _jwtHelper.CreateToken(user);
-        
+
         return new LoginResponse
         {
             AccessToken = token,

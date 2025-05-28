@@ -68,10 +68,10 @@ export default function AdminDashboardPage() {
 
       // Paralel olarak tüm istatistikleri getir
       const [ordersRes, recentOrdersRes] = await Promise.all([
-        fetch('http://localhost:5000/api/orders/stats', {
+        fetch('http://localhost:5128/api/orders/stats', {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch('http://localhost:5000/api/orders?limit=5&sort=createdAt&order=desc', {
+        fetch('http://localhost:5128/api/orders?limit=5&sort=createdAt&order=desc', {
           headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);

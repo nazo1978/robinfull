@@ -12,7 +12,6 @@ public class ApplicationUser : User
     public string PhoneNumber { get; set; }
     public string Address { get; set; }
     public DateTime RegistrationDate { get; set; }
-    public string UserType { get; set; }
 
     public ApplicationUser()
     {

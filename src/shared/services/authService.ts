@@ -3,7 +3,7 @@
  * Direct backend API calls for authentication
  */
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:5128/api';
 
 interface LoginCredentials {
   email: string;
@@ -24,13 +24,25 @@ interface ApiResponse<T = any> {
   timestamp: string;
 }
 
+interface LoginResponse {
+  accessToken: {
+    token: string;
+    expiration: string;
+  };
+  username: string;
+  email: string;
+}
+
 class AuthService {
   /**
    * Login user
    */
-  async login(credentials: LoginCredentials): Promise<ApiResponse> {
+  async login(credentials: LoginCredentials): Promise<ApiResponse<LoginResponse>> {
     try {
-      console.log('🔐 AuthService.login:', { email: credentials.email });
+      console.log('🔐 AuthService.login START:', {
+        email: credentials.email,
+        url: `${API_BASE_URL}/auth/login`
+      });
 
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
@@ -40,16 +52,38 @@ class AuthService {
         body: JSON.stringify(credentials),
       });
 
+      console.log('📡 AuthService.login RESPONSE:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
       const data = await response.json();
+      console.log('📦 AuthService.login DATA:', data);
 
       if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
+        console.error('❌ AuthService.login FAILED:', {
+          status: response.status,
+          data: data
+        });
+        throw new Error(data.message || data.title || 'Login failed');
       }
 
-      console.log('✅ AuthService.login success:', { userId: data.data?.user?.id });
-      return data;
+      console.log('✅ AuthService.login SUCCESS:', {
+        hasAccessToken: !!data.accessToken,
+        username: data.username,
+        email: data.email
+      });
+
+      return {
+        success: true,
+        data: data,
+        message: 'Login successful',
+        timestamp: new Date().toISOString()
+      };
     } catch (error) {
-      console.error('❌ AuthService.login error:', error);
+      console.error('❌ AuthService.login ERROR:', error);
       throw error;
     }
   }

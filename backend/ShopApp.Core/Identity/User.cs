@@ -16,4 +16,5 @@ public class User : BaseEntity
     public DateTime? LastLoginDate { get; set; }
     public bool IsActive { get; set; }
     public bool IsDeleted { get; set; }
+    public string UserType { get; set; } = "User"; // Admin, User, Seller
 }

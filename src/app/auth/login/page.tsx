@@ -5,7 +5,25 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { FiEye, FiEyeOff, FiUser, FiLock, FiLogIn } from 'react-icons/fi'
 import { useAuth } from '@/shared/context/AuthContext'
-import { authService } from '@/shared/services/authService'
+import authService from '@/services/AuthService'
+
+// JWT decode helper function
+function decodeJwtToken(token: string): any {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('JWT decode error:', error);
+    return null;
+  }
+}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -33,7 +51,10 @@ export default function LoginPage() {
     setError('')
 
     try {
-      console.log('🔐 Frontend login attempt:', { email: formData.email });
+      console.log('🔐 STEP 1 - Frontend login attempt:', {
+        email: formData.email,
+        passwordLength: formData.password.length
+      });
 
       // AuthService ile backend'e direkt istek
       const response = await authService.login({
@@ -41,25 +62,72 @@ export default function LoginPage() {
         password: formData.password
       });
 
-      console.log('✅ Frontend login success:', response);
+      console.log('🔐 STEP 2 - Frontend login response:', {
+        success: response.success,
+        hasData: !!response.data,
+        responseKeys: response.data ? Object.keys(response.data) : []
+      });
+
+      if (!response.data) {
+        throw new Error('Login response data is missing');
+      }
+
+      console.log('🔐 STEP 3 - Response data details:', {
+        hasAccessToken: !!response.data.accessToken,
+        accessTokenKeys: response.data.accessToken ? Object.keys(response.data.accessToken) : [],
+        username: response.data.username,
+        email: response.data.email
+      });
+
+      // AuthService'ten user bilgilerini al (AuthService zaten JWT'yi decode etti)
+      const user = authService.getCurrentUserFromStorage();
+
+      if (!user) {
+        throw new Error('User data not found after login');
+      }
+
+      console.log('🔐 STEP 4 - User object from AuthService:', {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        roles: user.roles,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName
+      });
 
       // AuthContext'e kullanıcı bilgilerini kaydet
-      login(response.data.user, response.data.token);
+      login(user, response.data.accessToken.token);
+      console.log('🔐 STEP 6 - User logged in to AuthContext');
+
+      // Token'ın cookie'ye kaydedilip kaydedilmediğini kontrol et
+      const savedToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('authToken='));
+      console.log('🔐 STEP 7 - Token saved to cookie:', {
+        hasCookie: !!savedToken,
+        cookieLength: savedToken ? savedToken.length : 0
+      });
 
       // Redirect parametresini kontrol et
       const redirectUrl = searchParams.get('redirect');
 
       // Kullanıcı rolüne göre yönlendirme
-      console.log('Kullanıcı rolü:', response.data.user?.role);
+      console.log('🔐 STEP 5 - Role-based routing:', {
+        userRoles: user.roles,
+        userRole: user.role,
+        isAdmin: user.role === 'admin' || user.roles?.includes('Admin'),
+        redirectUrl: redirectUrl
+      });
 
-      if (response.data.user?.role === 'admin') {
-        console.log('Admin paneline yönlendiriliyor...');
+      if (user.role === 'admin' || user.roles?.includes('Admin')) {
+        console.log('🔐 STEP 6 - Redirecting to admin dashboard...');
         router.push('/admin/dashboard');
       } else if (redirectUrl) {
-        console.log('Redirect URL\'ye yönlendiriliyor:', redirectUrl);
+        console.log('🔐 STEP 6 - Redirecting to:', redirectUrl);
         router.push(redirectUrl);
       } else {
-        console.log('Ana sayfaya yönlendiriliyor...');
+        console.log('🔐 STEP 6 - Redirecting to home page...');
         router.push('/');
       }
     } catch (err: any) {

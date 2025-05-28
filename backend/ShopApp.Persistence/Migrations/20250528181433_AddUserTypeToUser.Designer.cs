@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ShopApp.Persistence.Contexts;
@@ -11,9 +12,10 @@ using ShopApp.Persistence.Contexts;
 namespace ShopApp.Persistence.Migrations
 {
     [DbContext(typeof(ShopAppDbContext))]
-    partial class ShopAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250528181433_AddUserTypeToUser")]
+    partial class AddUserTypeToUser
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

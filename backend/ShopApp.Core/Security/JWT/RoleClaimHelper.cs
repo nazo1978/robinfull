@@ -14,25 +14,35 @@ public static class RoleClaimHelper
         // Tüm kullanıcılar User rolüne sahiptir
         claims.Add(new Claim(ClaimTypes.Role, Role.User));
 
-        // Müşteri türüne göre rol ata
-        // ApplicationUser'dan türetilen sınıflar için rol kontrolü
+        // ApplicationUser için rol ataması
         if (user is ApplicationUser appUser)
         {
-            // Kullanıcı tipine göre rol ataması
-            if (appUser.UserType == "BireyselMusteri")
+            // UserType'a göre rol ataması
+            switch (appUser.UserType?.ToLower())
             {
-                claims.Add(new Claim(ClaimTypes.Role, Role.Customer));
-                claims.Add(new Claim(ClaimTypes.Role, Role.BireyselMusteri));
-            }
-            else if (appUser.UserType == "KurumsalMusteri")
-            {
-                claims.Add(new Claim(ClaimTypes.Role, Role.Customer));
-                claims.Add(new Claim(ClaimTypes.Role, Role.KurumsalMusteri));
+                case "admin":
+                    claims.Add(new Claim(ClaimTypes.Role, Role.Admin));
+                    claims.Add(new Claim(ClaimTypes.Role, Role.Customer)); // Admin aynı zamanda customer işlemleri yapabilir
+                    break;
+
+                case "bireyselmusteri":
+                    claims.Add(new Claim(ClaimTypes.Role, Role.Customer));
+                    claims.Add(new Claim(ClaimTypes.Role, Role.BireyselMusteri));
+                    break;
+
+                case "kurumsalmusteri":
+                    claims.Add(new Claim(ClaimTypes.Role, Role.Customer));
+                    claims.Add(new Claim(ClaimTypes.Role, Role.KurumsalMusteri));
+                    break;
+
+                default: // "user" veya diğer durumlar
+                    claims.Add(new Claim(ClaimTypes.Role, Role.Customer));
+                    break;
             }
         }
 
-        // Admin kontrolü (gerçek uygulamada veritabanından kontrol edilmelidir)
-        if (user.Username == "admin")
+        // Fallback: Username kontrolü (geriye dönük uyumluluk için)
+        if (user.Username == "admin" || user.Email == "admin@shopapp.com")
         {
             claims.Add(new Claim(ClaimTypes.Role, Role.Admin));
         }

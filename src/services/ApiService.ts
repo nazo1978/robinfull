@@ -43,7 +43,7 @@ class ApiService {
    */
   private getAuthToken(): string | null {
     if (typeof window === 'undefined') return null;
-    
+
     // Cookie'den token almayı dene
     const cookieMatch = document.cookie.match(/authToken=([^;]+)/);
     if (cookieMatch) {
@@ -163,7 +163,9 @@ class ApiService {
 }
 
 // Singleton instance
-const apiService = new ApiService();
+const apiService = new ApiService(
+  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5128'
+);
 
 export default apiService;
 export { ApiService };

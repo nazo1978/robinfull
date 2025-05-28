@@ -71,16 +71,32 @@ public class JwtHelper : IJwtHelper
         claims.Add(new Claim(ClaimTypes.Email, user.Email));
         claims.Add(new Claim(ClaimTypes.Name, user.Username));
 
+        // UserType claim'ini ekle
+        if (!string.IsNullOrEmpty(user.UserType))
+        {
+            claims.Add(new Claim("UserType", user.UserType));
+
+            // UserType'a göre rol ekle
+            if (user.UserType == "Admin")
+            {
+                claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+            }
+            else if (user.UserType == "Seller")
+            {
+                claims.Add(new Claim(ClaimTypes.Role, "Seller"));
+            }
+            else
+            {
+                claims.Add(new Claim(ClaimTypes.Role, "User"));
+            }
+        }
+
         // Eğer ApplicationUser ise, ek bilgileri ekle
         if (user is ApplicationUser appUser)
         {
             claims.Add(new Claim(ClaimTypes.GivenName, appUser.FirstName));
             claims.Add(new Claim(ClaimTypes.Surname, appUser.LastName));
         }
-
-        // Rol bilgilerini ekle
-        var roleClaims = RoleClaimHelper.GetRoleClaims(user);
-        claims.AddRange(roleClaims);
 
         return claims;
     }
