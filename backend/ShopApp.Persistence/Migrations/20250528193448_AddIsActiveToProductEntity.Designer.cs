@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ShopApp.Persistence.Contexts;
@@ -11,9 +12,10 @@ using ShopApp.Persistence.Contexts;
 namespace ShopApp.Persistence.Migrations
 {
     [DbContext(typeof(ShopAppDbContext))]
-    partial class ShopAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250528193448_AddIsActiveToProductEntity")]
+    partial class AddIsActiveToProductEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -541,14 +543,6 @@ namespace ShopApp.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ImageAlt")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ImageUrl")
                         .IsRequired()
                         .HasColumnType("text");
 

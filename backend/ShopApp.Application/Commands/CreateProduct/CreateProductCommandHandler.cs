@@ -25,6 +25,9 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             Description = request.Description,
             Price = request.Price,
             StockQuantity = request.StockQuantity,
+            IsActive = request.IsActive,
+            ImageUrl = request.ImageUrl ?? "https://picsum.photos/400/300",
+            ImageAlt = request.ImageAlt ?? request.Name,
             CategoryId = request.CategoryId
         };
 
@@ -40,7 +43,12 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             Description = product.Description,
             Price = product.Price,
             StockQuantity = product.StockQuantity,
-            CategoryId = product.CategoryId
+            IsActive = product.IsActive,
+            ImageUrl = product.ImageUrl,
+            ImageAlt = product.ImageAlt,
+            CategoryId = product.CategoryId,
+            CreatedDate = product.CreatedDate,
+            ModifiedDate = product.ModifiedDate
         };
     }
-} 
+}

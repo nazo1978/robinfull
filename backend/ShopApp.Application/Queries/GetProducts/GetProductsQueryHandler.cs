@@ -29,9 +29,14 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, List<Pr
                 Description = p.Description,
                 Price = p.Price,
                 StockQuantity = p.StockQuantity,
+                IsActive = p.IsActive,
+                ImageUrl = p.ImageUrl,
+                ImageAlt = p.ImageAlt,
                 CategoryId = p.CategoryId,
-                CategoryName = p.Category.Name
+                CategoryName = p.Category.Name,
+                CreatedDate = p.CreatedDate,
+                ModifiedDate = p.ModifiedDate
             })
             .ToListAsync(cancellationToken);
     }
-} 
+}
