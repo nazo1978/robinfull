@@ -26,7 +26,10 @@ public class GetCategoriesQueryHandler : IRequestHandler<GetCategoriesQuery, Lis
                 Id = c.Id,
                 Name = c.Name,
                 Description = c.Description,
+                IsActive = c.IsActive,
+                CreatedDate = c.CreatedDate,
+                ModifiedDate = c.ModifiedDate
             })
             .ToListAsync(cancellationToken);
     }
-} 
+}

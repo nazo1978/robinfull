@@ -5,12 +5,15 @@ import { FiPlus, FiEdit, FiTrash2, FiSearch, FiRefreshCw, FiX, FiCheck } from 'r
 import { useAuth } from '@/shared/context/AuthContext'
 
 interface Category {
-  _id: string
+  id: string
+  _id?: string // Backward compatibility
   name: string
   description?: string
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
+  isActive?: boolean
+  createdAt?: string
+  updatedAt?: string
+  createdDate?: string
+  modifiedDate?: string
 }
 
 export default function CategoryManagement() {
@@ -51,7 +54,7 @@ export default function CategoryManagement() {
         throw new Error('Yetkilendirme token\'ı bulunamadı');
       }
 
-      const response = await fetch('http://localhost:5000/api/categories', {
+      const response = await fetch('http://localhost:5128/api/categories', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -62,7 +65,8 @@ export default function CategoryManagement() {
       console.log('CategoryManagement - Backend response:', data);
 
       // Backend response format'ına göre categories'i parse et
-      const categoriesData = data.data?.categories || data.categories || data.data || [];
+      // Backend direkt array dönüyor
+      const categoriesData = Array.isArray(data) ? data : (data.data?.categories || data.categories || data.data || []);
       console.log('CategoryManagement - Parsed categories:', categoriesData);
       setCategories(categoriesData)
     } catch (error: any) {
@@ -81,14 +85,12 @@ export default function CategoryManagement() {
 
       // Backend'in beklediği formata uygun veri hazırla
       const categoryData = {
-        name: formData.name,
-        slug: generateSlug(formData.name),
-        description: formData.description,
-        status: formData.isActive ? 'active' : 'inactive',
-        isActive: formData.isActive
+        Name: formData.name,
+        Description: formData.description,
+        IsActive: formData.isActive
       };
 
-      const response = await fetch('http://localhost:5000/api/categories', {
+      const response = await fetch('http://localhost:5128/api/categories', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -122,14 +124,13 @@ export default function CategoryManagement() {
 
       // Backend'in beklediği formata uygun veri hazırla
       const categoryData = {
-        name: formData.name,
-        slug: generateSlug(formData.name),
-        description: formData.description,
-        status: formData.isActive ? 'active' : 'inactive',
-        isActive: formData.isActive
+        Id: editingCategory.id || editingCategory._id,
+        Name: formData.name,
+        Description: formData.description,
+        IsActive: formData.isActive
       };
 
-      const response = await fetch(`http://localhost:5000/api/categories/${editingCategory._id}`, {
+      const response = await fetch(`http://localhost:5128/api/categories/${editingCategory.id || editingCategory._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -139,8 +140,16 @@ export default function CategoryManagement() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Kategori güncellenemedi');
+        let errorMessage = 'Kategori güncellenemedi';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          // Response JSON değilse text olarak oku
+          const errorText = await response.text();
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       setShowEditModal(false);
@@ -153,27 +162,44 @@ export default function CategoryManagement() {
     }
   };
 
+  // Kategori durumu güncelleme
   const toggleCategoryStatus = async (categoryId: string, newStatus: boolean) => {
     try {
       if (!token) {
         throw new Error('Yetkilendirme token\'ı bulunamadı');
       }
 
-      const response = await fetch(`http://localhost:5000/api/categories/${categoryId}`, {
+      // Önce kategoriyi bul
+      const category = categories.find(c => (c.id || c._id) === categoryId);
+      if (!category) {
+        throw new Error('Kategori bulunamadı');
+      }
+
+      const response = await fetch(`http://localhost:5128/api/categories/${categoryId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          status: newStatus ? 'active' : 'inactive',
-          isActive: newStatus
+          Id: categoryId,
+          Name: category.name,
+          Description: category.description,
+          IsActive: newStatus
         })
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Kategori durumu güncellenemedi');
+        let errorMessage = 'Kategori durumu güncellenemedi';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          // Response JSON değilse text olarak oku
+          const errorText = await response.text();
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       fetchCategories();
@@ -191,7 +217,7 @@ export default function CategoryManagement() {
         throw new Error('Yetkilendirme token\'ı bulunamadı');
       }
 
-      const response = await fetch(`http://localhost:5000/api/categories/${categoryId}`, {
+      const response = await fetch(`http://localhost:5128/api/categories/${categoryId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -315,7 +341,7 @@ export default function CategoryManagement() {
 
               <div className="flex justify-between items-center">
                 <button
-                  onClick={() => toggleCategoryStatus(category._id, !category.isActive)}
+                  onClick={() => toggleCategoryStatus(category.id || category._id || '', !category.isActive)}
                   className={`flex items-center px-3 py-1 text-sm rounded ${
                     category.isActive
                       ? 'text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300'
@@ -344,7 +370,7 @@ export default function CategoryManagement() {
                     Düzenle
                   </button>
                   <button
-                    onClick={() => handleDeleteCategory(category._id)}
+                    onClick={() => handleDeleteCategory(category.id || category._id || '')}
                     className="flex items-center px-3 py-1 text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                   >
                     <FiTrash2 className="w-4 h-4 mr-1" />

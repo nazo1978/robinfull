@@ -43,12 +43,19 @@ class ProductService {
   private readonly endpoint = '/api/products';
 
   /**
+   * Tüm ürünleri getir (alias for getAllProducts)
+   */
+  async getProducts(filters: ProductFilters = {}): Promise<ApiResponse<ProductListResponse>> {
+    return this.getAllProducts(filters);
+  }
+
+  /**
    * Tüm ürünleri getir
    */
   async getAllProducts(filters: ProductFilters = {}): Promise<ApiResponse<ProductListResponse>> {
     try {
       const queryParams = new URLSearchParams();
-      
+
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
           queryParams.append(key, value.toString());
@@ -98,7 +105,7 @@ class ProductService {
   /**
    * Kategoriye göre ürünleri getir
    */
-  async getProductsByCategory(category: string, filters: Omit<ProductFilters, 'category') = {}): Promise<ApiResponse<ProductListResponse>> {
+  async getProductsByCategory(category: string, filters: Omit<ProductFilters, 'category'> = {}): Promise<ApiResponse<ProductListResponse>> {
     return this.getAllProducts({ ...filters, category });
   }
 

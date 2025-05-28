@@ -98,7 +98,7 @@ const ProductManagement: React.FC = () => {
     try {
       if (!token) return;
 
-      const response = await fetch('http://localhost:5000/api/categories?limit=1000&page=1', {
+      const response = await fetch('http://localhost:5128/api/categories?limit=1000&page=1', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -136,7 +136,7 @@ const ProductManagement: React.FC = () => {
           return;
         }
 
-        const res = await fetch('http://localhost:5000/api/products', {
+        const res = await fetch('http://localhost:5128/api/products', {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -144,7 +144,7 @@ const ProductManagement: React.FC = () => {
 
         if (!res.ok) {
           // Admin endpoint yoksa normal endpoint'i dene
-          const fallbackRes = await fetch('http://localhost:5000/api/products');
+          const fallbackRes = await fetch('http://localhost:5128/api/products');
           if (!fallbackRes.ok) throw new Error('Ürünler alınamadı');
           const fallbackData = await fallbackRes.json();
           console.log('Fallback API yanıtı:', fallbackData);

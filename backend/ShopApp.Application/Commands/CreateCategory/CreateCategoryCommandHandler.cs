@@ -21,7 +21,8 @@ public class CreateCategoryCommandHandler : IRequestHandler<CreateCategoryComman
         var category = new Category
         {
             Name = request.Name,
-            Description = request.Description
+            Description = request.Description,
+            IsActive = request.IsActive
         };
 
         await _context.Categories.AddAsync(category, cancellationToken);
@@ -31,7 +32,10 @@ public class CreateCategoryCommandHandler : IRequestHandler<CreateCategoryComman
         {
             Id = category.Id,
             Name = category.Name,
-            Description = category.Description
+            Description = category.Description,
+            IsActive = category.IsActive,
+            CreatedDate = category.CreatedDate,
+            ModifiedDate = category.ModifiedDate
         };
     }
-} 
+}

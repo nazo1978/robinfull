@@ -9,6 +9,8 @@ import LotteryHighlight from '@/components/LotteryHighlight';
 import DynamicPricingBanner from '@/components/DynamicPricingBanner';
 import DynamicBanners from '@/components/DynamicBanners';
 import SafeImage from '@/components/SafeImage';
+import categoryService, { Category } from '@/services/CategoryService';
+import productService from '@/services/ProductService';
 
 interface ProductImage {
   url: string;
@@ -115,12 +117,18 @@ export default function Home() {
   const [activeAuctions, setActiveAuctions] = useState<Auction[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [exchangeProducts, setExchangeProducts] = useState<ExchangeProduct[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [newProducts, setNewProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProductsLoading, setIsProductsLoading] = useState(true);
   const [isExchangeLoading, setIsExchangeLoading] = useState(true);
+  const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
+  const [isNewProductsLoading, setIsNewProductsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [productsError, setProductsError] = useState<string | null>(null);
   const [exchangeError, setExchangeError] = useState<string | null>(null);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [newProductsError, setNewProductsError] = useState<string | null>(null);
 
   // Site ayarları
   const [sectionVisibility, setSectionVisibility] = useState({
@@ -233,10 +241,50 @@ export default function Home() {
       }
     };
 
+    const fetchCategories = async () => {
+      try {
+        setIsCategoriesLoading(true);
+        const response = await categoryService.getCategories();
+
+        if (response.success && response.data) {
+          setCategories(response.data);
+        } else {
+          setCategoriesError('Kategoriler yüklenirken bir hata oluştu');
+        }
+      } catch (err) {
+        setCategoriesError('Kategoriler yüklenirken bir hata oluştu');
+        setCategories([]);
+      } finally {
+        setIsCategoriesLoading(false);
+      }
+    };
+
+    const fetchNewProducts = async () => {
+      try {
+        setIsNewProductsLoading(true);
+        const response = await productService.getAllProducts({ limit: 8 });
+
+        if (response.success && response.data) {
+          // Backend'ten gelen data yapısına göre ayarla
+          const products = response.data.products || response.data || [];
+          setNewProducts(products);
+        } else {
+          setNewProductsError('Yeni ürünler yüklenirken bir hata oluştu');
+        }
+      } catch (err) {
+        setNewProductsError('Yeni ürünler yüklenirken bir hata oluştu');
+        setNewProducts([]);
+      } finally {
+        setIsNewProductsLoading(false);
+      }
+    };
+
     fetchActiveAuctions();
     fetchFeaturedProducts();
     fetchExchangeProducts();
     fetchSectionVisibility();
+    fetchCategories();
+    fetchNewProducts();
 
     // Her 30 saniyede bir güncelle
     const interval = setInterval(() => {
@@ -630,6 +678,152 @@ export default function Home() {
         </div>
       </section>
       )}
+
+      {/* Categories Section */}
+      {sectionVisibility.categories && (
+      <section className="py-12">
+        <h2 className="text-3xl font-bold mb-8 text-center text-gray-800 dark:text-white">Kategoriler</h2>
+
+        {isCategoriesLoading ? (
+          <div className="flex justify-center items-center h-32">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+          </div>
+        ) : categoriesError ? (
+          <div className="text-center py-8">
+            <p className="text-red-600 dark:text-red-400 mb-4">{categoriesError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Tekrar Dene
+            </button>
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-600 dark:text-gray-300">Kategori bulunmuyor.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {categories.map((category) => (
+              <Link
+                key={category.id}
+                href={`/products?category=${category.id}`}
+                className="group bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-6 text-center"
+              >
+                <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center group-hover:bg-blue-200 dark:group-hover:bg-blue-800 transition-colors">
+                  <FiPackage className="text-blue-600 dark:text-blue-300 text-2xl" />
+                </div>
+                <h3 className="font-semibold text-gray-800 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">
+                  {category.name}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 line-clamp-2">
+                  {category.description}
+                </p>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+      )}
+
+      {/* New Products Section */}
+      <section className="py-12 bg-gray-50 dark:bg-gray-800 -mx-4 px-4">
+        <div className="container mx-auto">
+          <h2 className="text-3xl font-bold mb-8 text-center text-gray-800 dark:text-white">Yeni Ürünler</h2>
+
+          {isNewProductsLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+            </div>
+          ) : newProductsError ? (
+            <div className="text-center py-12">
+              <p className="text-red-600 dark:text-red-400 mb-4">{newProductsError}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Tekrar Dene
+              </button>
+            </div>
+          ) : newProducts.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">Yeni ürün bulunmuyor.</p>
+              <Link
+                href="/products"
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Tüm Ürünleri Görüntüle
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {newProducts.map((product) => (
+                <div key={product.id} className="bg-white dark:bg-gray-700 rounded-lg shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group flex flex-col h-full">
+                  <div className="relative h-56 overflow-hidden flex-shrink-0 bg-gray-50 dark:bg-gray-600">
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <FiPackage className="text-4xl" />
+                    </div>
+                    <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded-md text-sm font-semibold">
+                      Yeni
+                    </div>
+                    {product.stockQuantity <= 5 && product.stockQuantity > 0 && (
+                      <div className="absolute top-2 right-2 bg-orange-500 text-white px-2 py-1 rounded-md text-sm font-semibold">
+                        Son {product.stockQuantity} Adet
+                      </div>
+                    )}
+                    {product.stockQuantity === 0 && (
+                      <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                        <span className="text-white font-semibold">Stokta Yok</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4 flex-1 flex flex-col">
+                    <h3 className="font-semibold text-lg mb-2 text-gray-800 dark:text-white line-clamp-2">
+                      {product.name}
+                    </h3>
+
+                    <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2 flex-1">
+                      {product.description}
+                    </p>
+
+                    <div className="flex flex-col gap-3 mt-auto">
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-bold text-gray-900 dark:text-white">
+                          {product.price?.toLocaleString('tr-TR')} ₺
+                        </span>
+                      </div>
+
+                      <Link
+                        href={`/products/${product.id}`}
+                        className={`w-full py-2 px-4 rounded-md text-center font-medium transition-colors ${
+                          product.stockQuantity > 0
+                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
+                      >
+                        {product.stockQuantity > 0 ? 'Detayları Gör' : 'Stokta Yok'}
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {newProducts.length > 0 && (
+            <div className="text-center mt-8">
+              <Link
+                href="/products"
+                className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
+              >
+                Tüm Ürünleri Görüntüle
+                <FiArrowRight />
+              </Link>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Dynamic Pricing Banner */}
       {sectionVisibility.dynamicPricing && <DynamicPricingBanner />}
