@@ -28,5 +28,9 @@ public interface IApplicationDbContext
     DbSet<BireyselMusteri> BireyselMusteriler { get; }
     DbSet<KurumsalMusteri> KurumsalMusteriler { get; }
 
+    // Order DbSet'leri
+    DbSet<Order> Orders { get; }
+    DbSet<OrderItem> OrderItems { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

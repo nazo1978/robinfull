@@ -36,6 +36,10 @@ public class ShopAppDbContext : DbContext, IApplicationDbContext
     public DbSet<BireyselMusteri> BireyselMusteriler => Set<BireyselMusteri>();
     public DbSet<KurumsalMusteri> KurumsalMusteriler => Set<KurumsalMusteri>();
 
+    // Order DbSet'leri
+    public DbSet<Order> Orders => Set<Order>();
+    public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return await base.SaveChangesAsync(cancellationToken);
