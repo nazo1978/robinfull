@@ -23,7 +23,7 @@ export default function SiteSettingsManagement() {
     auctionSection: true,
     categories: true
   });
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export default function SiteSettingsManagement() {
         .find(row => row.startsWith('authToken='))
         ?.split('=')[1];
 
-      const response = await fetch('http://localhost:5000/api/site-settings', {
+      const response = await fetch('http://localhost:5128/api/sitesettings/sections', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -60,8 +60,8 @@ export default function SiteSettingsManagement() {
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success && data.settings?.sections) {
-          setSections(data.settings.sections);
+        if (data.success && data.sections) {
+          setSections(data.sections);
         }
       }
     } catch (err) {
@@ -90,7 +90,7 @@ export default function SiteSettingsManagement() {
         .find(row => row.startsWith('authToken='))
         ?.split('=')[1];
 
-      const response = await fetch('http://localhost:5000/api/site-settings/sections', {
+      const response = await fetch('http://localhost:5128/api/sitesettings/sections', {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -184,7 +184,7 @@ export default function SiteSettingsManagement() {
                   </p>
                 </div>
               </div>
-              
+
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
@@ -201,7 +201,7 @@ export default function SiteSettingsManagement() {
         <div className="mt-6 p-4 bg-blue-50 rounded-lg">
           <h4 className="font-medium text-blue-900 mb-2">Bilgi</h4>
           <p className="text-sm text-blue-700">
-            Bu ayarlar ana sayfada hangi bölümlerin görüntüleneceğini kontrol eder. 
+            Bu ayarlar ana sayfada hangi bölümlerin görüntüleneceğini kontrol eder.
             Değişiklikler kaydedildikten sonra ana sayfada hemen etkili olur.
           </p>
         </div>

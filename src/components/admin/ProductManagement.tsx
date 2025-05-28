@@ -5,20 +5,29 @@ import { FiEdit, FiTrash2, FiPlus, FiSearch, FiX, FiImage, FiSave, FiAlertCircle
 import { useAuth } from '@/shared/context/AuthContext';
 
 interface Product {
-  _id: string;
+  id: string;
+  _id?: string; // Backward compatibility
   name: string;
   description: string;
   price: number;
-  category: string | { _id: string; name: string };
-  stock: number;
-  images: { url: string; alt: string }[];
-  featured: boolean;
-  discountPercentage: number;
-  isActive: boolean;
+  category?: string | { _id: string; name: string };
+  categoryId?: string;
+  categoryName?: string;
+  stock?: number;
+  stockQuantity?: number;
+  images?: { url: string; alt: string }[];
+  featured?: boolean;
+  discountPercentage?: number;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  createdDate?: string;
+  modifiedDate?: string;
 }
 
 interface ProductFormData {
   _id?: string;
+  id?: string;
   name: string;
   description: string;
   price: number;
@@ -98,7 +107,7 @@ const ProductManagement: React.FC = () => {
     try {
       if (!token) return;
 
-      const response = await fetch('http://localhost:5128/api/categories?limit=1000&page=1', {
+      const response = await fetch('http://localhost:5128/api/categories', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -107,11 +116,9 @@ const ProductManagement: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('🔥 ProductManagement - Categories response:', data);
-        console.log('🔥 ProductManagement - data.data:', data.data);
-        console.log('🔥 ProductManagement - data.data?.categories:', data.data?.categories);
-        console.log('🔥 ProductManagement - data.categories:', data.categories);
 
-        const categoriesData = data.data?.categories || data.categories || [];
+        // Backend direkt array dönüyor
+        const categoriesData = Array.isArray(data) ? data : (data.data?.categories || data.categories || data.data || []);
         console.log('🔥 ProductManagement - Final categories:', categoriesData);
         console.log('🔥 ProductManagement - Categories count:', categoriesData.length);
 
@@ -154,7 +161,9 @@ const ProductManagement: React.FC = () => {
 
         const data = await res.json();
         console.log('Products API yanıtı:', data);
-        setProducts(data.data?.products || data.products || []);
+        // Backend direkt array dönüyor
+        const productsData = Array.isArray(data) ? data : (data.data?.products || data.products || data.data || []);
+        setProducts(productsData);
       } catch (err: any) {
         setError(err.message || 'Bir hata oluştu');
         console.error('Ürünler yüklenirken hata:', err);
@@ -220,43 +229,25 @@ const ProductManagement: React.FC = () => {
   const handleEdit = (product: Product) => {
     console.log('Düzenlenecek ürün:', product);
 
-    // Ürün verilerini form formatına dönüştür
-    let categoryId = '';
+    // Backend'ten gelen categoryId'yi kullan
+    let categoryId = product.categoryId || '';
 
-    if (typeof product.category === 'object' && product.category?._id) {
-      // Category object ise _id'sini al
-      categoryId = product.category._id;
-      console.log('🔥 handleEdit - Category is object, using _id:', categoryId);
-    } else if (typeof product.category === 'string') {
-      // Category string ise, eğer ObjectId formatındaysa kullan, değilse category name'den ID bul
-      if (product.category.match(/^[0-9a-fA-F]{24}$/)) {
-        // Valid ObjectId
-        categoryId = product.category;
-        console.log('🔥 handleEdit - Category is valid ObjectId:', categoryId);
-      } else {
-        // Category name, ID'sini bul
-        const foundCategory = categories.find(cat => cat.name === product.category);
-        if (foundCategory) {
-          categoryId = foundCategory._id;
-          console.log('🔥 handleEdit - Category is name, found ID:', categoryId, 'for name:', product.category);
-        } else {
-          // Kategori bulunamadı, boş bırak
-          categoryId = '';
-          console.warn('🔥 handleEdit - Category not found for name:', product.category);
-        }
-      }
-    }
+    // Backend'ten gelen image data'sını işle
+    const images = product.imageUrl
+      ? [{ url: product.imageUrl, alt: product.imageAlt || product.name || '' }]
+      : product.images && product.images.length > 0
+        ? product.images.map(img => ({ url: img.url || '', alt: img.alt || '' }))
+        : [{ url: 'https://picsum.photos/400/300', alt: product.name || '' }];
 
     setFormData({
       _id: product._id,
+      id: product.id,
       name: product.name || '',
       description: product.description || '',
       price: product.price !== undefined ? product.price : 0,
-      category: categoryId || '',
-      stock: product.stock !== undefined ? product.stock : 0,
-      images: product.images && product.images.length > 0
-        ? product.images.map(img => ({ url: img.url || '', alt: img.alt || '' }))
-        : [{ url: 'https://picsum.photos/400/300', alt: product.name || '' }],
+      category: categoryId,
+      stock: product.stockQuantity || product.stock || 0,
+      images: images,
       featured: product.featured !== undefined ? product.featured : false,
       discountPercentage: product.discountPercentage !== undefined ? product.discountPercentage : 0,
       isActive: typeof product.isActive === 'boolean' ? product.isActive : true
@@ -292,7 +283,7 @@ const ProductManagement: React.FC = () => {
       }
 
       // Doğrudan backend API'sine istek at
-      const res = await fetch(`http://localhost:5000/api/products/${id}`, {
+      const res = await fetch(`http://localhost:5128/api/products/${id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -331,6 +322,23 @@ const ProductManagement: React.FC = () => {
         return;
       }
 
+      // Form validation
+      if (!formData.name || formData.name.trim() === '') {
+        throw new Error('Ürün adı gereklidir');
+      }
+      if (!formData.description || formData.description.trim() === '') {
+        throw new Error('Ürün açıklaması gereklidir');
+      }
+      if (!formData.price || formData.price <= 0) {
+        throw new Error('Geçerli bir fiyat giriniz');
+      }
+      if (!formData.stock || formData.stock < 0) {
+        throw new Error('Geçerli bir stok miktarı giriniz');
+      }
+      if (!formData.category || formData.category === '') {
+        throw new Error('Lütfen bir kategori seçin');
+      }
+
       console.log('Kullanılacak token:', token ? `${token.substring(0, 20)}...` : 'Token yok');
       console.log('🔥 ProductManagement - Form data before processing:', formData);
       console.log('🔥 ProductManagement - formData.category:', formData.category);
@@ -339,15 +347,19 @@ const ProductManagement: React.FC = () => {
       // Category ID'sini doğru şekilde işle
       let categoryId = null;
       if (formData.category && formData.category !== '') {
-        // Eğer category ObjectId formatındaysa kullan
-        if (formData.category.match(/^[0-9a-fA-F]{24}$/)) {
+        // Eğer category GUID formatındaysa kullan
+        if (formData.category.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i)) {
+          categoryId = formData.category;
+          console.log('🔥 Category is valid GUID:', categoryId);
+        } else if (formData.category.match(/^[0-9a-fA-F]{24}$/)) {
+          // MongoDB ObjectId formatı
           categoryId = formData.category;
           console.log('🔥 Category is valid ObjectId:', categoryId);
         } else {
           // Category name ise ID'sini bul
           const foundCategory = categories.find(cat => cat.name === formData.category);
           if (foundCategory) {
-            categoryId = foundCategory._id;
+            categoryId = foundCategory.id || foundCategory._id;
             console.log('🔥 Category name converted to ID:', categoryId, 'for name:', formData.category);
           } else {
             console.warn('🔥 Category not found for name:', formData.category);
@@ -356,30 +368,49 @@ const ProductManagement: React.FC = () => {
         }
       }
 
+      if (!categoryId) {
+        throw new Error('Lütfen bir kategori seçin');
+      }
+
       console.log('🔥 Final categoryId:', categoryId);
 
-      // Backend'in beklediği formata uygun veri hazırla
-      const formDataToSend = {
-        name: formData.name,
-        description: formData.description,
-        price: Number(formData.price),
-        categoryId: categoryId, // Backend categoryId bekliyor
-        stock: Number(formData.stock),
-        images: formData.images.map(img => ({
-          url: img.url || 'https://picsum.photos/400/300',
-          alt: img.alt || formData.name
-        })),
-        featured: formData.featured,
-        discountPercentage: Number(formData.discountPercentage),
-        isActive: formData.isActive
+      // Image URL'sini hazırla
+      const imageUrl = formData.images && formData.images.length > 0 && formData.images[0].url
+        ? formData.images[0].url
+        : "https://picsum.photos/400/300";
+
+      const imageAlt = formData.images && formData.images.length > 0 && formData.images[0].alt
+        ? formData.images[0].alt
+        : formData.name;
+
+      // Backend'in beklediği formata uygun veri hazırla (Pascal Case)
+      const formDataToSend = isEditing ? {
+        Id: formData._id || formData.id,
+        Name: formData.name,
+        Description: formData.description,
+        Price: Number(formData.price),
+        StockQuantity: Number(formData.stock),
+        IsActive: formData.isActive,
+        ImageUrl: imageUrl,
+        ImageAlt: imageAlt,
+        CategoryId: categoryId
+      } : {
+        Name: formData.name,
+        Description: formData.description,
+        Price: Number(formData.price),
+        StockQuantity: Number(formData.stock),
+        IsActive: formData.isActive,
+        ImageUrl: imageUrl,
+        ImageAlt: imageAlt,
+        CategoryId: categoryId
       };
 
       console.log('Gönderilecek form verisi:', formDataToSend);
 
       // Doğrudan backend API'sine istek at
       const url = isEditing
-        ? `http://localhost:5000/api/products/${formData._id}`
-        : 'http://localhost:5000/api/products';
+        ? `http://localhost:5128/api/products/${formData._id || formData.id}`
+        : 'http://localhost:5128/api/products';
 
       const method = isEditing ? 'PUT' : 'POST';
 
@@ -392,20 +423,32 @@ const ProductManagement: React.FC = () => {
         body: JSON.stringify(formDataToSend)
       });
 
+      if (!res.ok) {
+        let errorMessage = isEditing ? 'Ürün güncellenemedi' : 'Ürün eklenemedi';
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.message || errorMessage;
+          console.error('Backend error response:', errorData);
+        } catch {
+          const errorText = await res.text();
+          errorMessage = errorText || errorMessage;
+          console.error('Backend error text:', errorText);
+        }
+        throw new Error(errorMessage);
+      }
+
       const data = await res.json();
       console.log('API yanıtı:', data);
 
-      if (!res.ok) throw new Error(data.message || (isEditing ? 'Ürün güncellenemedi' : 'Ürün eklenemedi'));
-
-      // Backend response format: { success: true, data: { product: {...} } }
-      const updatedProduct = data.data?.product || data.product;
+      // Backend response format: ProductDto
+      const updatedProduct = data;
       console.log('🔥 Updated product:', updatedProduct);
 
       if (isEditing) {
         // Ürünü listede güncelle
         if (updatedProduct) {
           setProducts(products.map(product =>
-            product._id === updatedProduct._id ? updatedProduct : product
+            (product.id || product._id) === (updatedProduct.id || updatedProduct._id) ? updatedProduct : product
           ));
           setSuccessMessage('Ürün başarıyla güncellendi');
         }
@@ -433,56 +476,31 @@ const ProductManagement: React.FC = () => {
 
   // Kategori adını getir
   const getCategoryName = (product: any) => {
-    console.log('🔥 getCategoryName - product:', product.name);
-    console.log('🔥 getCategoryName - product.categoryId:', product.categoryId);
-    console.log('🔥 getCategoryName - product.category:', product.category);
-    console.log('🔥 getCategoryName - available categories:', categories.length);
-
-    // Önce categoryId object'ini kontrol et (populate edilmiş)
-    if (product.categoryId && typeof product.categoryId === 'object' && product.categoryId.name) {
-      console.log('🔥 getCategoryName - Found populated categoryId:', product.categoryId.name);
-      return product.categoryId.name;
+    // Backend'ten gelen categoryName field'ını önce kontrol et
+    if (product.categoryName) {
+      return product.categoryName;
     }
 
-    // Sonra category field'ını kontrol et (populate edilmiş)
-    if (product.category && typeof product.category === 'object' && product.category.name) {
-      console.log('🔥 getCategoryName - Found populated category:', product.category.name);
-      return product.category.name;
-    }
-
-    // categoryId string ise (ObjectId), categories array'inde ara
+    // categoryId string ise (GUID), categories array'inde ara
     if (product.categoryId && typeof product.categoryId === 'string') {
-      console.log('🔥 getCategoryName - Searching for categoryId:', product.categoryId);
-      console.log('🔥 getCategoryName - Available category IDs:', categories.map(cat => cat._id));
-
-      const foundCategory = categories.find(cat => cat._id === product.categoryId);
+      const foundCategory = categories.find(cat => (cat.id || cat._id) === product.categoryId);
       if (foundCategory) {
-        console.log('🔥 getCategoryName - Found category by ID:', foundCategory.name);
         return foundCategory.name;
-      } else {
-        console.log('🔥 getCategoryName - Category not found for ID:', product.categoryId);
-        console.log('🔥 getCategoryName - Available categories:', categories.map(cat => ({ _id: cat._id, name: cat.name })));
-        return `Kategori Bulunamadı (${product.categoryId.substring(0, 8)}...)`;
       }
     }
 
-    // category string ise (ObjectId), categories array'inde ara
-    if (product.category && typeof product.category === 'string') {
-      console.log('🔥 getCategoryName - Searching for category:', product.category);
-      console.log('🔥 getCategoryName - Available category IDs:', categories.map(cat => cat._id));
-
-      const foundCategory = categories.find(cat => cat._id === product.category);
-      if (foundCategory) {
-        console.log('🔥 getCategoryName - Found category by ID (category field):', foundCategory.name);
-        return foundCategory.name;
-      } else {
-        console.log('🔥 getCategoryName - Category not found for ID (category field):', product.category);
-        console.log('🔥 getCategoryName - Available categories:', categories.map(cat => ({ _id: cat._id, name: cat.name })));
-        return `Kategori Bulunamadı (${product.category.substring(0, 8)}...)`;
+    // category field'ını kontrol et (backward compatibility)
+    if (product.category) {
+      if (typeof product.category === 'object' && product.category.name) {
+        return product.category.name;
+      } else if (typeof product.category === 'string') {
+        const foundCategory = categories.find(cat => (cat.id || cat._id) === product.category);
+        if (foundCategory) {
+          return foundCategory.name;
+        }
       }
     }
 
-    console.log('🔥 getCategoryName - No category found, returning default');
     return 'Kategori Yok';
   };
 
@@ -568,14 +586,14 @@ const ProductManagement: React.FC = () => {
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredProducts.map((product) => (
-                  <tr key={product._id}>
+                  <tr key={product.id || product._id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-10 w-10 flex-shrink-0">
                           <img
                             className="h-10 w-10 rounded-full object-cover"
-                            src={product.images && product.images.length > 0 ? product.images[0].url : 'https://picsum.photos/400/300'}
-                            alt={product.name}
+                            src={product.imageUrl || (product.images && product.images.length > 0 ? product.images[0].url : 'https://picsum.photos/400/300')}
+                            alt={product.imageAlt || product.name}
                           />
                         </div>
                         <div className="ml-4">
@@ -585,16 +603,16 @@ const ProductManagement: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">{getCategoryName(product)}</div>
+                      <div className="text-sm text-gray-900 dark:text-white">{product.categoryName || getCategoryName(product)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">{product.price.toLocaleString('tr-TR')} ₺</div>
-                      {product.discountPercentage > 0 && (
+                      <div className="text-sm text-gray-900 dark:text-white">{product.price?.toLocaleString('tr-TR')} ₺</div>
+                      {product.discountPercentage && product.discountPercentage > 0 && (
                         <div className="text-xs text-green-600">%{product.discountPercentage} indirim</div>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">{product.stock}</div>
+                      <div className="text-sm text-gray-900 dark:text-white">{product.stockQuantity || product.stock}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -704,11 +722,14 @@ const ProductManagement: React.FC = () => {
                       required
                     >
                       <option value="">Kategori Seçin</option>
-                      {categories.filter(cat => cat.isActive).map(category => (
-                        <option key={category._id} value={category._id}>
-                          {category.name}
-                        </option>
-                      ))}
+                      {categories.filter(cat => cat.isActive !== false).map(category => {
+                        const categoryId = category.id || category._id;
+                        return (
+                          <option key={categoryId} value={categoryId}>
+                            {category.name}
+                          </option>
+                        );
+                      })}
                       {categories.length === 0 && (
                         <option value="" disabled>Kategori bulunamadı</option>
                       )}

@@ -18,23 +18,29 @@ interface ProductImage {
 }
 
 interface Product {
-  _id: string;
+  id: string;
+  _id?: string; // Backward compatibility
   name: string;
   description: string;
   price: number;
   originalPrice?: number;
-  discountPercentage: number;
-  images: ProductImage[];
-  category: {
+  discountPercentage?: number;
+  images?: ProductImage[];
+  category?: {
     _id: string;
     name: string;
     slug: string;
   };
-  stock: number;
-  featured: boolean;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  categoryId?: string;
+  categoryName?: string;
+  stock?: number;
+  stockQuantity?: number;
+  featured?: boolean;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  createdDate?: string;
+  modifiedDate?: string;
 }
 
 interface Auction {
@@ -146,23 +152,8 @@ export default function Home() {
     const fetchActiveAuctions = async () => {
       try {
         setIsLoading(true);
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
-        const response = await fetch(`${apiBaseUrl}/api/auctions?status=active&limit=4`);
-
-        if (!response.ok) {
-          throw new Error('Açık artırmalar yüklenirken bir hata oluştu');
-        }
-
-        const data = await response.json();
-
-        if (data.success && data.auctions) {
-          setActiveAuctions(data.auctions);
-        } else if (data.auctions) {
-          // Backend'den direkt auctions array gelirse
-          setActiveAuctions(data.auctions);
-        } else {
-          setActiveAuctions([]);
-        }
+        // Açık artırmalar şimdilik devre dışı - MongoDB backend gerekli
+        setActiveAuctions([]);
       } catch (err) {
         setError('Açık artırmalar yüklenirken bir hata oluştu');
         setActiveAuctions([]);
@@ -174,18 +165,23 @@ export default function Home() {
     const fetchFeaturedProducts = async () => {
       try {
         setIsProductsLoading(true);
-        const response = await fetch('http://localhost:5000/api/products/featured');
+        // Önce yeni backend'i dene
+        const response = await fetch('http://localhost:5128/api/products');
 
         if (!response.ok) {
           throw new Error('Öne çıkan ürünler yüklenirken bir hata oluştu');
         }
 
         const data = await response.json();
+        console.log('Featured products API response:', data);
 
-        if (data.success && data.products) {
+        // Backend direkt array dönüyor
+        if (Array.isArray(data)) {
+          // Sadece aktif ürünleri al ve ilk 8'ini göster
+          const activeProducts = data.filter(product => product.isActive !== false).slice(0, 8);
+          setFeaturedProducts(activeProducts);
+        } else if (data.success && data.products) {
           setFeaturedProducts(data.products);
-        } else if (Array.isArray(data)) {
-          setFeaturedProducts(data);
         } else {
           setFeaturedProducts([]);
         }
@@ -200,23 +196,8 @@ export default function Home() {
     const fetchExchangeProducts = async () => {
       try {
         setIsExchangeLoading(true);
-        const response = await fetch('http://localhost:5000/api/exchange/products?status=approved&limit=4');
-
-        if (!response.ok) {
-          throw new Error('Takas ürünleri yüklenirken bir hata oluştu');
-        }
-
-        const data = await response.json();
-
-        if (data.success && data.items) {
-          setExchangeProducts(data.items);
-        } else if (data.success && data.products) {
-          setExchangeProducts(data.products);
-        } else if (Array.isArray(data)) {
-          setExchangeProducts(data);
-        } else {
-          setExchangeProducts([]);
-        }
+        // Takas ürünleri şimdilik devre dışı - MongoDB backend gerekli
+        setExchangeProducts([]);
       } catch (err) {
         setExchangeError('Takas ürünleri yüklenirken bir hata oluştu');
         setExchangeProducts([]);
@@ -227,13 +208,16 @@ export default function Home() {
 
     const fetchSectionVisibility = async () => {
       try {
-        const response = await fetch('/api/site-settings/sections');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.sections) {
-            setSectionVisibility(data.sections);
-          }
-        }
+        // Site ayarları şimdilik varsayılan değerlerle
+        setSectionVisibility({
+          featuredProducts: true,
+          dynamicBanners: false, // Şimdilik kapalı
+          dynamicPricing: false, // Şimdilik kapalı
+          lotterySection: false, // Şimdilik kapalı
+          exchangeSection: false, // Şimdilik kapalı
+          auctionSection: false, // Şimdilik kapalı
+          categories: true
+        });
       } catch (err) {
         // Site ayarları yüklenirken hata
       } finally {
@@ -362,83 +346,89 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredProducts.map((product) => (
-              <div key={product._id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group flex flex-col h-full">
-                <div className="relative h-56 overflow-hidden flex-shrink-0 bg-gray-50 dark:bg-gray-700">
-                  <SafeImage
-                    src={product.images}
-                    alt={product.name}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 25vw"
-                    className="object-contain group-hover:scale-105 transition-transform duration-300 p-2"
-                    fallbackText="Resim yok"
-                  />
-                  {product.discountPercentage > 0 && (
-                    <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-md text-sm font-semibold">
-                      %{product.discountPercentage} İndirim
-                    </div>
-                  )}
-                  {product.stock <= 5 && product.stock > 0 && (
-                    <div className="absolute top-2 right-2 bg-orange-500 text-white px-2 py-1 rounded-md text-sm font-semibold">
-                      Son {product.stock} Adet
-                    </div>
-                  )}
-                  {product.stock === 0 && (
-                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                      <span className="text-white font-semibold">Stokta Yok</span>
-                    </div>
-                  )}
-                </div>
+            {featuredProducts.map((product) => {
+              const productId = product.id || product._id;
+              const stockQuantity = product.stockQuantity || product.stock || 0;
+              const categoryName = product.categoryName || (typeof product.category === 'object' ? product.category?.name : product.category) || 'Kategori Yok';
 
-                <div className="p-4">
-                  <div className="mb-2">
-                    <span className="text-xs text-blue-600 dark:text-blue-400 font-medium uppercase tracking-wide">
-                      {typeof product.category === 'object' ? product.category.name : product.category}
-                    </span>
-                  </div>
-
-                  <h3 className="font-semibold text-lg mb-2 text-gray-800 dark:text-white line-clamp-2">
-                    {product.name}
-                  </h3>
-
-                  <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">
-                    {product.description}
-                  </p>
-
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col">
-                        {product.discountPercentage > 0 && product.originalPrice ? (
-                          <>
-                            <span className="text-lg font-bold text-gray-900 dark:text-white">
-                              {product.price.toLocaleString('tr-TR')} ₺
-                            </span>
-                            <span className="text-sm text-gray-500 line-through">
-                              {product.originalPrice.toLocaleString('tr-TR')} ₺
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-lg font-bold text-gray-900 dark:text-white">
-                            {product.price.toLocaleString('tr-TR')} ₺
-                          </span>
-                        )}
+              return (
+                <div key={productId} className="bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group flex flex-col h-full">
+                  <div className="relative h-56 overflow-hidden flex-shrink-0 bg-gray-50 dark:bg-gray-700">
+                    <SafeImage
+                      src={product.imageUrl ? [{ url: product.imageUrl, alt: product.imageAlt || product.name }] : (product.images || [])}
+                      alt={product.imageAlt || product.name}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 25vw"
+                      className="object-contain group-hover:scale-105 transition-transform duration-300 p-2"
+                      fallbackText="Resim yok"
+                    />
+                    {product.discountPercentage && product.discountPercentage > 0 && (
+                      <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-md text-sm font-semibold">
+                        %{product.discountPercentage} İndirim
                       </div>
+                    )}
+                    {stockQuantity <= 5 && stockQuantity > 0 && (
+                      <div className="absolute top-2 right-2 bg-orange-500 text-white px-2 py-1 rounded-md text-sm font-semibold">
+                        Son {stockQuantity} Adet
+                      </div>
+                    )}
+                    {stockQuantity === 0 && (
+                      <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                        <span className="text-white font-semibold">Stokta Yok</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4">
+                    <div className="mb-2">
+                      <span className="text-xs text-blue-600 dark:text-blue-400 font-medium uppercase tracking-wide">
+                        {categoryName}
+                      </span>
                     </div>
 
-                    <Link
-                      href={`/products/${product._id}`}
-                      className={`w-full py-2 px-4 rounded-md text-center font-medium transition-colors ${
-                        product.stock > 0
-                          ? 'bg-blue-600 text-white hover:bg-blue-700'
-                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
-                    >
-                      {product.stock > 0 ? 'Detayları Gör' : 'Stokta Yok'}
-                    </Link>
+                    <h3 className="font-semibold text-lg mb-2 text-gray-800 dark:text-white line-clamp-2">
+                      {product.name}
+                    </h3>
+
+                    <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">
+                      {product.description}
+                    </p>
+
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          {product.discountPercentage && product.discountPercentage > 0 && product.originalPrice ? (
+                            <>
+                              <span className="text-lg font-bold text-gray-900 dark:text-white">
+                                {product.price?.toLocaleString('tr-TR')} ₺
+                              </span>
+                              <span className="text-sm text-gray-500 line-through">
+                                {product.originalPrice.toLocaleString('tr-TR')} ₺
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-lg font-bold text-gray-900 dark:text-white">
+                              {product.price?.toLocaleString('tr-TR')} ₺
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <Link
+                        href={`/products/${productId}`}
+                        className={`w-full py-2 px-4 rounded-md text-center font-medium transition-colors ${
+                          stockQuantity > 0
+                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
+                      >
+                        {stockQuantity > 0 ? 'Detayları Gör' : 'Stokta Yok'}
+                      </Link>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

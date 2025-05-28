@@ -36,8 +36,7 @@ public static class ServiceRegistration
         services.AddScoped<Application.Interfaces.IBireyselMusteriRepository, BireyselMusteriRepository>();
         services.AddScoped<Application.Interfaces.IKurumsalMusteriRepository, KurumsalMusteriRepository>();
 
-        // Auction Repository
-        services.AddScoped<IAuctionRepository, AuctionRepository>();
+
 
         // Discount Repository
         services.AddScoped<IDiscountRepository, DiscountRepository>();

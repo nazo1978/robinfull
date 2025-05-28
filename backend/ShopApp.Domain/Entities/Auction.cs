@@ -1,32 +1,40 @@
 using System;
 using System.Collections.Generic;
 using ShopApp.Core.Common;
+using ShopApp.Core.Identity;
 
 namespace ShopApp.Domain.Entities
 {
     public class Auction : BaseEntity
     {
         public Guid ProductId { get; set; }
-        public Product Product { get; set; }
+        public Product Product { get; set; } = null!;
 
         // Zaman bilgileri
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
-        public int CountdownDuration { get; set; } // Geriye sayaç süresi (dakika)
 
         // Fiyat bilgileri
-        public decimal StartingPrice { get; set; }
+        public decimal StartPrice { get; set; }
         public decimal CurrentPrice { get; set; }
-        public decimal MaxPrice { get; set; } // Maksimum fiyat limiti
-
-        // Ürün bilgileri
-        public int ProductQuantity { get; set; } // Açık artırmadaki ürün adedi
+        public decimal MinIncrement { get; set; } = 1;
 
         // Durum bilgileri
-        public Guid? CurrentWinnerId { get; set; }
-        public bool IsActive { get; set; }
+        public AuctionStatus Status { get; set; } = AuctionStatus.Pending;
+        public Guid? HighestBidderId { get; set; }
+        public ApplicationUser? HighestBidder { get; set; }
+
+        public string? Description { get; set; }
 
         // İlişkiler
-        public ICollection<AuctionBid> Bids { get; set; } = new List<AuctionBid>();
+        public ICollection<Bid> Bids { get; set; } = new List<Bid>();
+    }
+
+    public enum AuctionStatus
+    {
+        Pending = 0,    // Henüz başlamamış
+        Active = 1,     // Aktif
+        Ended = 2,      // Sona ermiş
+        Cancelled = 3   // İptal edilmiş
     }
 }

@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using ShopApp.Application.DTOs;
-using ShopApp.Application.Features.Auctions.Queries.GetAuctionById;
 
 namespace ShopApp.WebApi.Hubs
 {
@@ -65,7 +64,7 @@ namespace ShopApp.WebApi.Hubs
         }
 
         // Açık artırma bilgilerini güncelleme
-        public async Task SendAuctionUpdate(GetAuctionByIdResponse auction)
+        public async Task SendAuctionUpdate(AuctionDto auction)
         {
             await Clients.Group(auction.Id.ToString()).SendAsync("AuctionUpdate", auction);
         }

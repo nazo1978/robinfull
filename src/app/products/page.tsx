@@ -22,28 +22,20 @@ export default function ProductsPage() {
         setLoading(true);
 
         // Search parametresi varsa URL'ye ekle
-        let apiUrl = '/api/products';
+        let apiUrl = 'http://localhost:5128/api/products';
         if (searchQuery) {
           apiUrl += `?search=${encodeURIComponent(searchQuery)}`;
         }
 
-        // API isteğini göreceli URL ile yap (Next.js API Routes kullanılıyorsa)
+        // Yeni backend API'sine doğrudan istek
         const res = await fetch(apiUrl);
 
         if (!res.ok) {
-          // Eğer API isteği başarısız olursa, önce backend API'sine doğrudan istek dene
-          const backendRes = await fetch('http://localhost:5000/api/products');
-
-          if (!backendRes.ok) {
-            throw new Error('Ürünler alınamadı');
-          }
-
-          const data = await backendRes.json();
-          processProductData(data);
-          return;
+          throw new Error('Ürünler alınamadı');
         }
 
         const data = await res.json();
+        console.log('Products API response:', data);
         processProductData(data);
       } catch (err: any) {
         setError(err.message || 'Bir hata oluştu');
@@ -98,27 +90,23 @@ export default function ProductsPage() {
 
   // API'den gelen ürün verilerini işle
   const processProductData = (data: any) => {
-    // API'nin döndürdüğü yapıya göre ürünleri al
-    const productList = data.products || data;
+    // PostgreSQL backend direkt array döndürüyor
+    const productList = Array.isArray(data) ? data : (data.products || data);
 
     // Ürünleri kontrol et ve gerekli dönüşümleri yap
     const formattedProducts = productList.map((product: any) => ({
-      id: product._id || product.id,
+      id: product.id,
       name: product.name,
-      description: product.description || product.desc || '',
+      description: product.description || '',
       price: product.price,
       originalPrice: product.originalPrice || product.price,
       discountPercentage: product.discountPercentage || 0,
-      image: product.images && product.images.length > 0
-        ? (typeof product.images[0] === 'string' ? product.images[0] : product.images[0].url)
-        : 'https://picsum.photos/400/300',
-      images: product.images
-        ? product.images.map((img: any) => typeof img === 'string' ? img : (img.url || img))
-        : ['https://picsum.photos/400/300'],
-      category: product.category,
-      stock: product.stock || 10,
-      createdAt: new Date(product.createdAt || Date.now()),
-      updatedAt: new Date(product.updatedAt || Date.now()),
+      image: product.imageUrl || 'https://picsum.photos/400/300',
+      images: product.imageUrl ? [product.imageUrl] : ['https://picsum.photos/400/300'],
+      category: product.categoryName || product.category || 'Genel',
+      stock: product.stockQuantity || 0,
+      createdAt: new Date(product.createdDate || Date.now()),
+      updatedAt: new Date(product.modifiedDate || Date.now()),
       rating: product.rating || 4.5,
       numReviews: product.numReviews || 0,
       featured: product.featured || false,

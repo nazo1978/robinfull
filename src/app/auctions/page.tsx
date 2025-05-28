@@ -36,14 +36,38 @@ export default function AuctionsPage() {
     const fetchAuctions = async () => {
       setIsLoading(true)
       try {
-        const response = await fetch('/api/auctions?status=active')
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5128'
+        const response = await fetch(`${apiBaseUrl}/api/auctions?Status=active`)
         if (!response.ok) throw new Error('Açık artırmalar yüklenirken bir hata oluştu')
         const data = await response.json()
-        setAuctions(data.auctions || [])
+        console.log('Ana sayfa açık artırma verisi:', data)
+
+        // PostgreSQL'den gelen veriyi MongoDB formatına çevir
+        let formattedAuctions = []
+        if (data.success && data.auctions) {
+          formattedAuctions = data.auctions.map((auction: any) => ({
+            _id: auction.id,
+            productId: {
+              _id: auction.product?.id || auction.productId,
+              name: auction.product?.name || 'İsimsiz Ürün',
+              images: auction.product?.imageUrl ? [auction.product.imageUrl] : [],
+              category: auction.product?.categoryName || 'Diğer'
+            },
+            startPrice: auction.startPrice,
+            currentPrice: auction.currentPrice,
+            startTime: auction.startTime,
+            endTime: auction.endTime,
+            status: auction.status,
+            bids: auction.bids || []
+          }))
+        }
+
+        console.log('Formatlanmış açık artırmalar:', formattedAuctions)
+        setAuctions(formattedAuctions)
 
         // Kategorileri çek
         const uniqueCategories = new Set<string>(["Tümü"])
-        data.auctions.forEach((auction: Auction) => {
+        formattedAuctions.forEach((auction: Auction) => {
           if (auction.productId?.category) {
             uniqueCategories.add(auction.productId.category)
           }

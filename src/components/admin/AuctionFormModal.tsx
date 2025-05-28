@@ -76,29 +76,50 @@ export default function AuctionFormModal({
     setIsLoading(true)
     try {
       console.log('Ürünler getiriliyor...')
-      const response = await fetch('http://localhost:5000/api/products?limit=100')
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5128'
+      const response = await fetch(`${apiBaseUrl}/api/products?PageSize=100`)
 
       if (response.ok) {
         const data = await response.json()
         console.log('Ürünler başarıyla getirildi:', data)
+        console.log('Data type:', typeof data)
+        console.log('Data keys:', Object.keys(data))
+        console.log('Is array?', Array.isArray(data))
 
-        if (data && data.products && data.products.length > 0) {
-          setProducts(data.products)
+        // PostgreSQL API'si direkt array döndürüyor
+        if (Array.isArray(data) && data.length > 0) {
+          console.log('Array formatında veri geldi, ürün sayısı:', data.length)
+          // PostgreSQL'den gelen ürünleri MongoDB formatına çevir
+          const formattedProducts = data.map((product: any) => {
+            console.log('Ham ürün verisi:', product)
+            return {
+              _id: product.id, // PostgreSQL'de id, MongoDB'de _id
+              name: product.name,
+              images: product.imageUrl ? [product.imageUrl] : [], // PostgreSQL'de tek imageUrl
+              price: product.price,
+              // Ek alanlar da ekleyelim
+              description: product.description,
+              categoryName: product.categoryName
+            }
+          })
+          console.log('Formatlanmış ürünler:', formattedProducts)
+          setProducts(formattedProducts)
         } else {
           console.error('API yanıtında ürün verisi yok veya boş')
+          console.error('Data structure:', data)
+          console.error('Is array?', Array.isArray(data))
+          console.error('Data length:', Array.isArray(data) ? data.length : 'Not array')
           setError('Ürün verisi alınamadı')
           setProducts([])
         }
       } else {
         console.error('API yanıtı başarısız:', response.status)
         setError('Ürünler yüklenirken bir hata oluştu')
-
         setProducts([])
       }
     } catch (err) {
       console.error('Ürünler çekilirken hata:', err)
       setError('Ürünler yüklenirken bir hata oluştu')
-
       setProducts([])
     } finally {
       setIsLoading(false)
@@ -236,13 +257,21 @@ export default function AuctionFormModal({
               required
               disabled={isEditing}
             >
-              <option value="">Ürün Seçin</option>
+              <option value="">
+                {isLoading ? 'Ürünler yükleniyor...' :
+                 products.length === 0 ? 'Ürün bulunamadı' :
+                 'Ürün Seçin'}
+              </option>
               {products.map(product => (
                 <option key={product._id} value={product._id}>
                   {product.name || 'İsimsiz Ürün'} - {product.price ? product.price.toLocaleString() : 0} ₺
                 </option>
               ))}
             </select>
+            {/* Debug bilgisi */}
+            <div className="text-xs text-gray-500 mt-1">
+              Debug: {products.length} ürün yüklendi, Loading: {isLoading ? 'Evet' : 'Hayır'}
+            </div>
           </div>
 
           {selectedProduct && (

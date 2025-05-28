@@ -1,658 +1,454 @@
-import React, { useState, useEffect } from 'react';
-import {
-  FiPlus,
-  FiEdit2,
-  FiTrash2,
-  FiSearch,
-  FiFilter,
-  FiCheckCircle,
-  FiXCircle,
-  FiUser,
-  FiUserCheck
-} from 'react-icons/fi';
-import { useAuth } from '@/shared/context/AuthContext';
-import UserFormModal from './UserFormModal';
-import DeleteConfirmModal from './DeleteConfirmModal';
+'use client'
 
-// Kullanıcı tipi
+import { useState, useEffect } from 'react'
+import { FiEdit, FiTrash2, FiSearch, FiRefreshCw, FiX, FiCheck, FiUser, FiMail, FiShield } from 'react-icons/fi'
+import { useAuth } from '@/shared/context/AuthContext'
+
 interface User {
-  _id: string;
-  name: string;
-  email: string;
-  username: string;
-  role: 'user' | 'admin' | 'seller';
-  status: 'active' | 'inactive' | 'suspended';
-  isEmailVerified: boolean;
-  isApproved?: boolean;
-  approvalStatus?: 'pending' | 'approved' | 'rejected' | 'suspended';
-  rejectionReason?: string;
-  canBid?: boolean;
-  canParticipateInLottery?: boolean;
-  avatar?: string;
-  createdAt: string;
-  password?: string; // Sadece yeni kullanıcı oluştururken kullanılır
+  id: string
+  username: string
+  email: string
+  emailConfirmed: boolean
+  lastLoginDate?: string
+  isActive: boolean
+  isDeleted: boolean
+  userType: string
+  createdDate: string
+  modifiedDate?: string
 }
 
-const UserManagement = () => {
-  const { token, isAuthenticated, isAdmin } = useAuth();
+function UserManagement() {
+  const { token, isAuthenticated, isAdmin } = useAuth()
+  const [users, setUsers] = useState<User[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [userTypeFilter, setUserTypeFilter] = useState('')
+  const [isActiveFilter, setIsActiveFilter] = useState<boolean | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    emailConfirmed: false,
+    isActive: true,
+    userType: 'User'
+  })
 
-  // State tanımlamaları
-  const [users, setUsers] = useState<User[]>([]);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [showUserModal, setShowUserModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isFormSubmitting, setIsFormSubmitting] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalUsers, setTotalUsers] = useState(0);
-  const [roleFilter, setRoleFilter] = useState('');
-  const [sortField, setSortField] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState('desc');
+  useEffect(() => {
+    fetchUsers()
+  }, [])
 
-  // Kullanıcıları getir
   const fetchUsers = async () => {
+    setIsLoading(true)
     try {
-      setIsLoading(true);
-      setError(null);
+      console.log('UserManagement - Token:', token ? `${token.substring(0, 20)}...` : 'Token yok');
 
       if (!token) {
-        setError('Yetkilendirme token\'ı bulunamadı');
-        return;
+        throw new Error('Yetkilendirme token\'ı bulunamadı');
       }
 
-      // Sorgu parametrelerini oluştur
-      const queryParams = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: '10',
-        ...(searchTerm && { search: searchTerm }),
-        ...(roleFilter && { role: roleFilter }),
-        sort: sortField,
-        order: sortOrder
-      }).toString();
+      const queryParams = new URLSearchParams();
+      if (searchTerm) queryParams.append('searchTerm', searchTerm);
+      if (userTypeFilter) queryParams.append('userType', userTypeFilter);
+      if (isActiveFilter !== null) queryParams.append('isActive', isActiveFilter.toString());
 
-      console.log('🔍 Fetching users:', { queryParams });
-
-      const response = await fetch(`http://localhost:5000/api/users?${queryParams}`, {
+      const response = await fetch(`http://localhost:5128/api/users?${queryParams.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${token}`
         }
       });
 
-      console.log('📥 Users response status:', response.status);
+      if (!response.ok) throw new Error('Kullanıcılar getirilemedi')
+      const data = await response.json()
+      console.log('UserManagement - Backend response:', data);
 
-      const data = await response.json();
-      console.log('📥 Users response data:', data);
-      console.log('📥 Raw users array:', data.data?.users || data.users);
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Kullanıcılar getirilirken bir hata oluştu');
-      }
-
-      const users = data.data?.users || data.users || [];
-      console.log('👥 Users loaded:', users.map(u => ({
-        id: u._id,
-        idType: typeof u._id,
-        name: u.name,
-        email: u.email,
-        fullUser: u
-      })));
-
-      setUsers(users);
-      setTotalPages(data.data?.totalPages || data.totalPages || 1);
-      setTotalUsers(data.data?.total || data.total || 0);
-    } catch (err: any) {
-      setError(err.message || 'Kullanıcılar getirilirken bir hata oluştu');
+      setUsers(Array.isArray(data) ? data : [])
+    } catch (error: any) {
+      console.error('Kullanıcıları getirme hatası:', error)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
-
-  // Sayfa yüklendiğinde ve filtreler/sayfa değiştiğinde kullanıcıları getir
-  useEffect(() => {
-    if (isAuthenticated && isAdmin && token) {
-      fetchUsers();
-    }
-  }, [currentPage, searchTerm, roleFilter, sortField, sortOrder, isAuthenticated, isAdmin, token]);
-
-  // Auth kontrolü
-  if (!isAuthenticated || !isAdmin) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          Bu sayfaya erişim yetkiniz yok. Admin olarak giriş yapmanız gerekiyor.
-        </div>
-      </div>
-    );
   }
 
-  // Kullanıcı oluşturma/güncelleme işlemi
-  const handleSaveUser = async (userData: Partial<User>) => {
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingUser) return;
+
     try {
-      console.log('💾 Saving user data:', userData);
-      console.log('💾 Selected user:', selectedUser);
-
-      setIsFormSubmitting(true);
-
       if (!token) {
-        throw new Error('Admin oturumu bulunamadı. Lütfen tekrar giriş yapın.');
+        throw new Error('Yetkilendirme token\'ı bulunamadı');
       }
 
-      let response;
-      if (selectedUser) {
-        console.log('✏️ Updating user:', {
-          selectedUser,
-          userId: selectedUser._id,
-          userIdType: typeof selectedUser._id
-        });
+      const userData = {
+        Username: formData.username,
+        Email: formData.email,
+        EmailConfirmed: formData.emailConfirmed,
+        IsActive: formData.isActive,
+        UserType: formData.userType
+      };
 
-        if (!selectedUser._id || selectedUser._id === 'undefined') {
-          throw new Error('Geçersiz kullanıcı ID\'si');
-        }
-
-        // Kullanıcıyı güncelle
-        console.log('🔥 PUT request URL:', `http://localhost:5000/api/users/${selectedUser._id}`);
-        response = await fetch(`http://localhost:5000/api/users/${selectedUser._id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(userData),
-        });
-      } else {
-        // Yeni kullanıcı oluştur
-        response = await fetch('http://localhost:5000/api/users', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(userData),
-        });
-      }
-
-      const data = await response.json();
-      console.log('📥 Save user response:', { status: response.status, data });
+      const response = await fetch(`http://localhost:5128/api/users/${editingUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(userData)
+      });
 
       if (!response.ok) {
-        console.error('❌ Save user failed:', data);
-        throw new Error(data.message || 'Kullanıcı kaydedilirken bir hata oluştu');
+        let errorMessage = 'Kullanıcı güncellenemedi';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          const errorText = await response.text();
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
-      // Kullanıcıları tekrar getir ve formu kapat
+      setShowEditModal(false);
+      setEditingUser(null);
+      setFormData({ username: '', email: '', emailConfirmed: false, isActive: true, userType: 'User' });
       fetchUsers();
-      setShowUserModal(false);
-      setSelectedUser(null);
-    } catch (err: any) {
-      setError(err.message || 'Kullanıcı kaydedilirken bir hata oluştu');
-    } finally {
-      setIsFormSubmitting(false);
+    } catch (error: any) {
+      console.error('Kullanıcı güncelleme hatası:', error);
+      alert('Kullanıcı güncellenirken bir hata oluştu: ' + (error.message || error));
     }
   };
 
-  // Kullanıcı silme işlemi
-  const handleDeleteUser = async () => {
-    if (!selectedUser) return;
-
-    console.log('🗑️ Deleting user:', {
-      selectedUser,
-      userId: selectedUser._id,
-      userIdType: typeof selectedUser._id
-    });
-
-    if (!selectedUser._id || selectedUser._id === 'undefined') {
-      setError('Geçersiz kullanıcı ID\'si');
-      return;
-    }
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Bu kullanıcıyı silmek istediğinizden emin misiniz?')) return;
 
     try {
-      setIsFormSubmitting(true);
-
       if (!token) {
-        throw new Error('Admin oturumu bulunamadı. Lütfen tekrar giriş yapın.');
+        throw new Error('Yetkilendirme token\'ı bulunamadı');
       }
 
-      console.log('🔥 DELETE request URL:', `http://localhost:5000/api/users/${selectedUser._id}`);
-
-      const response = await fetch(`http://localhost:5000/api/users/${selectedUser._id}`, {
+      const response = await fetch(`http://localhost:5128/api/users/${userId}`, {
         method: 'DELETE',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        },
+        }
       });
-
-      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Kullanıcı silinirken bir hata oluştu');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Kullanıcı silinemedi');
       }
 
-      // Kullanıcıları tekrar getir ve modalı kapat
       fetchUsers();
-      setShowDeleteModal(false);
-      setSelectedUser(null);
-      setSuccess('Kullanıcı başarıyla silindi');
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Kullanıcı silinirken bir hata oluştu');
-      setTimeout(() => setError(null), 3000);
-    } finally {
-      setIsFormSubmitting(false);
+    } catch (error: any) {
+      console.error('Kullanıcı silme hatası:', error);
+      alert('Kullanıcı silinirken bir hata oluştu: ' + (error.message || error));
     }
   };
 
-  // Kullanıcı onaylama
-  const handleApproveUser = async (userId: string, reason: string = '') => {
-    try {
-      if (!token) {
-        setError('Bu işlem için giriş yapmanız gerekiyor');
-        setTimeout(() => setError(null), 3000);
-        return;
-      }
+  const openEditModal = (user: User) => {
+    setEditingUser(user);
+    setFormData({
+      username: user.username,
+      email: user.email,
+      emailConfirmed: user.emailConfirmed,
+      isActive: user.isActive,
+      userType: user.userType
+    });
+    setShowEditModal(true);
+  };
 
-      const response = await fetch(`http://localhost:5000/api/users/${userId}/approve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ reason })
-      });
+  const closeModal = () => {
+    setShowEditModal(false);
+    setEditingUser(null);
+    setFormData({ username: '', email: '', emailConfirmed: false, isActive: true, userType: 'User' });
+  };
 
-      const data = await response.json();
-
-      if (data.success) {
-        // Kullanıcı listesini güncelle
-        setUsers(users.map(user =>
-          user._id === userId
-            ? { ...user, isApproved: true, approvalStatus: 'approved', canBid: true, canParticipateInLottery: true }
-            : user
-        ));
-        setSuccess('Kullanıcı başarıyla onaylandı');
-        setTimeout(() => setSuccess(null), 3000);
-      } else {
-        setError(data.message || 'Kullanıcı onaylanırken bir hata oluştu');
-        setTimeout(() => setError(null), 3000);
-      }
-    } catch (error) {
-      console.error('Kullanıcı onaylama hatası:', error);
-      setError('Kullanıcı onaylanırken bir hata oluştu');
-      setTimeout(() => setError(null), 3000);
+  const getUserTypeColor = (userType: string) => {
+    switch (userType) {
+      case 'Admin':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      case 'Seller':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
     }
   };
 
-  // Kullanıcı reddetme
-  const handleRejectUser = async (userId: string, reason: string) => {
-    try {
-      if (!token) {
-        setError('Bu işlem için giriş yapmanız gerekiyor');
-        setTimeout(() => setError(null), 3000);
-        return;
-      }
-
-      const response = await fetch(`http://localhost:5000/api/users/${userId}/reject`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ reason })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        // Kullanıcı listesini güncelle
-        setUsers(users.map(user =>
-          user._id === userId
-            ? { ...user, isApproved: false, approvalStatus: 'rejected', rejectionReason: reason, canBid: false, canParticipateInLottery: false }
-            : user
-        ));
-        setSuccess('Kullanıcı başarıyla reddedildi');
-        setTimeout(() => setSuccess(null), 3000);
-      } else {
-        setError(data.message || 'Kullanıcı reddedilirken bir hata oluştu');
-        setTimeout(() => setError(null), 3000);
-      }
-    } catch (error) {
-      console.error('Kullanıcı reddetme hatası:', error);
-      setError('Kullanıcı reddedilirken bir hata oluştu');
-      setTimeout(() => setError(null), 3000);
+  const getUserTypeIcon = (userType: string) => {
+    switch (userType) {
+      case 'Admin':
+        return <FiShield className="w-4 h-4" />;
+      case 'Seller':
+        return <FiUser className="w-4 h-4" />;
+      default:
+        return <FiUser className="w-4 h-4" />;
     }
-  };
-
-  // Kullanıcı düzenleme modalını aç
-  const handleEditUser = (user: User) => {
-    setSelectedUser(user);
-    setShowUserModal(true);
-  };
-
-  // Kullanıcı silme modalını aç
-  const handleShowDeleteModal = (user: User) => {
-    setSelectedUser(user);
-    setShowDeleteModal(true);
-  };
-
-  // Yeni kullanıcı ekleme modalını aç
-  const handleAddUser = () => {
-    setSelectedUser(null);
-    setShowUserModal(true);
   };
 
   return (
-    <div className="p-6 max-w-full">
+    <div className="p-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-        <h2 className="text-2xl font-semibold mb-4 md:mb-0">Kullanıcı Yönetimi</h2>
-        <div className="flex flex-col sm:flex-row gap-4">
+        <h1 className="text-2xl font-bold mb-4 md:mb-0">Kullanıcı Yönetimi</h1>
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           <div className="relative">
             <input
               type="text"
               placeholder="Kullanıcı ara..."
-              className="border rounded-md px-10 py-2 w-full"
+              className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-black dark:focus:ring-white focus:border-transparent"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <FiSearch className="absolute left-3 top-3 text-gray-400" />
+            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
           </div>
-          <div className="relative">
-            <select
-              className="border rounded-md pl-10 pr-4 py-2 bg-white"
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-            >
-              <option value="">Tüm Roller</option>
-              <option value="user">Kullanıcı</option>
-              <option value="admin">Admin</option>
-              <option value="seller">Satıcı</option>
-            </select>
-            <FiFilter className="absolute left-3 top-3 text-gray-400" />
-          </div>
-          <button
-            onClick={handleAddUser}
-            className="bg-black text-white dark:bg-white dark:text-black px-4 py-2 rounded-md flex items-center"
+
+          <select
+            value={userTypeFilter}
+            onChange={(e) => setUserTypeFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-black dark:focus:ring-white"
           >
-            <FiPlus className="mr-2" /> Yeni Kullanıcı
+            <option value="">Tüm Tipler</option>
+            <option value="Admin">Admin</option>
+            <option value="Seller">Satıcı</option>
+            <option value="User">Kullanıcı</option>
+          </select>
+
+          <select
+            value={isActiveFilter === null ? '' : isActiveFilter.toString()}
+            onChange={(e) => setIsActiveFilter(e.target.value === '' ? null : e.target.value === 'true')}
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-black dark:focus:ring-white"
+          >
+            <option value="">Tüm Durumlar</option>
+            <option value="true">Aktif</option>
+            <option value="false">Pasif</option>
+          </select>
+
+          <button
+            onClick={fetchUsers}
+            className="flex items-center justify-center px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+          >
+            <FiRefreshCw className="mr-2" />
+            Yenile
           </button>
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-black dark:border-white"></div>
         </div>
-      )}
-
-      {success && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-          {success}
+      ) : users.length === 0 ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 text-center">
+          <p className="text-gray-500 dark:text-gray-400">
+            {searchTerm || userTypeFilter || isActiveFilter !== null
+              ? 'Arama kriterlerine uygun kullanıcı bulunamadı.'
+              : 'Henüz kullanıcı bulunmuyor.'}
+          </p>
         </div>
-      )}
-
-      <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-700">
-            <tr>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer"
-                onClick={() => {
-                  if (sortField === 'username') {
-                    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                  } else {
-                    setSortField('username');
-                    setSortOrder('asc');
-                  }
-                }}
-              >
-                Kullanıcı
-                {sortField === 'username' && (
-                  <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer"
-                onClick={() => {
-                  if (sortField === 'role') {
-                    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                  } else {
-                    setSortField('role');
-                    setSortOrder('asc');
-                  }
-                }}
-              >
-                Rol
-                {sortField === 'role' && (
-                  <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Durum
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Onay Durumu
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer"
-                onClick={() => {
-                  if (sortField === 'createdAt') {
-                    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                  } else {
-                    setSortField('createdAt');
-                    setSortOrder('desc');
-                  }
-                }}
-              >
-                Kayıt Tarihi
-                {sortField === 'createdAt' && (
-                  <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                İşlemler
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            {isLoading ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-4 whitespace-nowrap text-center">
-                  <div className="flex justify-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-black dark:border-white"></div>
-                  </div>
-                </td>
-              </tr>
-            ) : users.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-4 whitespace-nowrap text-center text-gray-500 dark:text-gray-400">
-                  Kullanıcı bulunamadı
-                </td>
-              </tr>
-            ) : (
-              users.map((user) => (
-                <tr key={user._id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        <img
-                          className="h-10 w-10 rounded-full"
-                          src={user.avatar || 'https://via.placeholder.com/40'}
-                          alt={user.name}
-                        />
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {user.name}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {user.email}
-                        </div>
-                        <div className="text-xs text-gray-400 dark:text-gray-500">
-                          @{user.username}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                      ${user.role === 'admin' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
-                        user.role === 'seller' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'}`}>
-                      {user.role === 'admin' ? 'Admin' :
-                        user.role === 'seller' ? 'Satıcı' : 'Kullanıcı'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex flex-col space-y-1">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                        ${user.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                          'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
-                        {user.status === 'active' ? 'Aktif' : 'Pasif'}
-                      </span>
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                        ${user.isEmailVerified ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                          'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'}`}>
-                        {user.isEmailVerified ? 'E-posta Doğrulanmış' : 'E-posta Doğrulanmamış'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex flex-col space-y-1">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                        ${user.approvalStatus === 'approved' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                          user.approvalStatus === 'rejected' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                          user.approvalStatus === 'suspended' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
-                          'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'}`}>
-                        {user.approvalStatus === 'approved' ? 'Onaylandı' :
-                          user.approvalStatus === 'rejected' ? 'Reddedildi' :
-                          user.approvalStatus === 'suspended' ? 'Askıya Alındı' : 'Beklemede'}
-                      </span>
-                      {user.canBid && (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                          Teklif Verebilir
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {new Date(user.createdAt).toLocaleDateString('tr-TR')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex flex-col space-y-2">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEditUser(user)}
-                          className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-200"
-                        >
-                          <FiEdit2 className="inline mr-1" /> Düzenle
-                        </button>
-                        <button
-                          onClick={() => handleShowDeleteModal(user)}
-                          className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-200"
-                        >
-                          <FiTrash2 className="inline mr-1" /> Sil
-                        </button>
-                      </div>
-                      {user.role !== 'admin' && (
-                        <div className="flex space-x-2">
-                          {user.approvalStatus !== 'approved' && (
-                            <button
-                              onClick={() => handleApproveUser(user._id)}
-                              className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-200 text-xs"
-                            >
-                              ✓ Onayla
-                            </button>
-                          )}
-                          {user.approvalStatus !== 'rejected' && user.approvalStatus === 'approved' && (
-                            <button
-                              onClick={() => {
-                                const reason = prompt('Reddetme sebebi (opsiyonel):');
-                                if (reason !== null) {
-                                  handleRejectUser(user._id, reason);
-                                }
-                              }}
-                              className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-200 text-xs"
-                            >
-                              ✗ Reddet
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </td>
+      ) : (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Kullanıcı
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Tip
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Durum
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Son Giriş
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Kayıt Tarihi
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    İşlemler
+                  </th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Sayfalama */}
-      <div className="flex justify-between items-center mt-6">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Toplam {totalUsers} kullanıcı | Sayfa {currentPage} / {totalPages}
-        </p>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-            className={`px-4 py-2 border rounded-md ${
-              currentPage === 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-700'
-                : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
-            }`}
-          >
-            Önceki
-          </button>
-          <button
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-            className={`px-4 py-2 border rounded-md ${
-              currentPage === totalPages
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-700'
-                : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
-            }`}
-          >
-            Sonraki
-          </button>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {users.map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <div className="h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                            <FiUser className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {user.username}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                            <FiMail className="w-3 h-3 mr-1" />
+                            {user.email}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getUserTypeColor(user.userType)}`}>
+                        {getUserTypeIcon(user.userType)}
+                        <span className="ml-1">{user.userType}</span>
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col space-y-1">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          user.isActive
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                        }`}>
+                          {user.isActive ? (
+                            <>
+                              <FiCheck className="w-3 h-3 mr-1" />
+                              Aktif
+                            </>
+                          ) : (
+                            <>
+                              <FiX className="w-3 h-3 mr-1" />
+                              Pasif
+                            </>
+                          )}
+                        </span>
+                        {user.emailConfirmed && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                            <FiMail className="w-3 h-3 mr-1" />
+                            Email Onaylı
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {user.lastLoginDate
+                        ? new Date(user.lastLoginDate).toLocaleDateString('tr-TR')
+                        : 'Hiç giriş yapmamış'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {new Date(user.createdDate).toLocaleDateString('tr-TR')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={() => openEditModal(user)}
+                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                          <FiEdit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                        >
+                          <FiTrash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-
-      {/* Kullanıcı ekleme/düzenleme modalı için buraya UserFormModal eklenecek */}
-      {showUserModal && (
-        <UserFormModal
-          user={selectedUser}
-          onClose={() => {
-            setShowUserModal(false);
-            setSelectedUser(null);
-          }}
-          onSave={handleSaveUser}
-          isSubmitting={isFormSubmitting}
-        />
       )}
 
-      {/* Silme onay modalı */}
-      {showDeleteModal && (
-        <DeleteConfirmModal
-          title="Kullanıcı Silme"
-          message={`${selectedUser?.name} isimli kullanıcıyı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`}
-          onConfirm={handleDeleteUser}
-          onCancel={() => {
-            setShowDeleteModal(false);
-            setSelectedUser(null);
-          }}
-          isSubmitting={isFormSubmitting}
-        />
+      {/* Edit User Modal */}
+      {showEditModal && editingUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Kullanıcı Düzenle</h2>
+              <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">
+                <FiX className="w-6 h-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditUser}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Kullanıcı Adı</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.username}
+                  onChange={(e) => setFormData({...formData, username: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-black dark:focus:ring-white"
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Email</label>
+                <input
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-black dark:focus:ring-white"
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Kullanıcı Tipi</label>
+                <select
+                  value={formData.userType}
+                  onChange={(e) => setFormData({...formData, userType: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-black dark:focus:ring-white"
+                >
+                  <option value="User">Kullanıcı</option>
+                  <option value="Seller">Satıcı</option>
+                  <option value="Admin">Admin</option>
+                </select>
+              </div>
+
+              <div className="mb-4">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.emailConfirmed}
+                    onChange={(e) => setFormData({...formData, emailConfirmed: e.target.checked})}
+                    className="mr-2"
+                  />
+                  Email Onaylı
+                </label>
+              </div>
+
+              <div className="mb-6">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.isActive}
+                    onChange={(e) => setFormData({...formData, isActive: e.target.checked})}
+                    className="mr-2"
+                  />
+                  Aktif
+                </label>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-black text-white rounded-lg hover:opacity-90"
+                >
+                  Güncelle
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
-};
+}
 
 export default UserManagement;

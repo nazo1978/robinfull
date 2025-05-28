@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ShopApp.Persistence.Contexts;
@@ -11,9 +12,10 @@ using ShopApp.Persistence.Contexts;
 namespace ShopApp.Persistence.Migrations
 {
     [DbContext(typeof(ShopAppDbContext))]
-    partial class ShopAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250528214247_AddSiteSettings")]
+    partial class AddSiteSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -96,23 +98,32 @@ namespace ShopApp.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("CountdownDuration")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("CurrentPrice")
-                        .HasColumnType("numeric");
+                        .HasColumnType("numeric(18,2)");
 
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
+                    b.Property<Guid?>("CurrentWinnerId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("EndTime")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("HighestBidderId")
-                        .HasColumnType("uuid");
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
-                    b.Property<decimal>("MinIncrement")
-                        .HasColumnType("numeric");
+                    b.Property<decimal>("MaxPrice")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m);
 
                     b.Property<DateTime?>("ModifiedDate")
                         .HasColumnType("timestamp with time zone");
@@ -120,18 +131,18 @@ namespace ShopApp.Persistence.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
-                    b.Property<decimal>("StartPrice")
-                        .HasColumnType("numeric");
+                    b.Property<int>("ProductQuantity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
+                    b.Property<decimal>("StartingPrice")
+                        .HasColumnType("numeric(18,2)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("HighestBidderId");
 
                     b.HasIndex("ProductId");
 
@@ -148,7 +159,7 @@ namespace ShopApp.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("BidAmount")
-                        .HasColumnType("numeric");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<DateTime>("BidTime")
                         .HasColumnType("timestamp with time zone");
@@ -167,45 +178,6 @@ namespace ShopApp.Persistence.Migrations
                     b.HasIndex("AuctionId");
 
                     b.ToTable("AuctionBids");
-                });
-
-            modelBuilder.Entity("ShopApp.Domain.Entities.Bid", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid>("AuctionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("BidTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsWinning")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ModifiedDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AuctionId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Bids");
                 });
 
             modelBuilder.Entity("ShopApp.Domain.Entities.Cart", b =>
@@ -815,17 +787,11 @@ namespace ShopApp.Persistence.Migrations
 
             modelBuilder.Entity("ShopApp.Domain.Entities.Auction", b =>
                 {
-                    b.HasOne("ShopApp.Core.Identity.ApplicationUser", "HighestBidder")
-                        .WithMany()
-                        .HasForeignKey("HighestBidderId");
-
                     b.HasOne("ShopApp.Domain.Entities.Product", "Product")
                         .WithMany()
                         .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("HighestBidder");
 
                     b.Navigation("Product");
                 });
@@ -833,31 +799,12 @@ namespace ShopApp.Persistence.Migrations
             modelBuilder.Entity("ShopApp.Domain.Entities.AuctionBid", b =>
                 {
                     b.HasOne("ShopApp.Domain.Entities.Auction", "Auction")
-                        .WithMany()
-                        .HasForeignKey("AuctionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Auction");
-                });
-
-            modelBuilder.Entity("ShopApp.Domain.Entities.Bid", b =>
-                {
-                    b.HasOne("ShopApp.Domain.Entities.Auction", "Auction")
                         .WithMany("Bids")
                         .HasForeignKey("AuctionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("ShopApp.Core.Identity.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Auction");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("ShopApp.Domain.Entities.CartItem", b =>

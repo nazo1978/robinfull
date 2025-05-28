@@ -4,10 +4,10 @@ using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using ShopApp.Application.Behaviors;
-using ShopApp.Application.Features.Auctions.Rules;
+
 using ShopApp.Application.Features.BireyselMusteriler.Rules;
 using ShopApp.Application.Features.KurumsalMusteriler.Rules;
-using ShopApp.Application.Services.Auctions;
+
 using ShopApp.Application.Services.Discounts;
 
 namespace ShopApp.Application;
@@ -36,10 +36,8 @@ public static class ServiceRegistration
         // Business Rules
         services.AddScoped<BireyselMusteriBusinessRules>();
         services.AddScoped<KurumsalMusteriBusinessRules>();
-        services.AddScoped<AuctionBusinessRules>();
 
         // Services
-        services.AddScoped<IAuctionService, AuctionService>();
         services.AddScoped<IDiscountService, DiscountService>();
 
         return services;

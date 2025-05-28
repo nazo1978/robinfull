@@ -40,6 +40,12 @@ public class ShopAppDbContext : DbContext, IApplicationDbContext
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
 
+    // Site Settings
+    public DbSet<SiteSetting> SiteSettings => Set<SiteSetting>();
+
+    // Bid DbSet'i
+    public DbSet<Bid> Bids => Set<Bid>();
+
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return await base.SaveChangesAsync(cancellationToken);

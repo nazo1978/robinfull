@@ -16,7 +16,7 @@ interface Category {
   modifiedDate?: string
 }
 
-export default function CategoryManagement() {
+function CategoryManagement() {
   const { token, isAuthenticated, isAdmin } = useAuth()
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -29,17 +29,6 @@ export default function CategoryManagement() {
     description: '',
     isActive: true
   })
-
-  // Slug generate function
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
-      .replace(/-+/g, '-') // Replace multiple hyphens with single
-      .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
-  };
 
   useEffect(() => {
     fetchCategories()
@@ -241,7 +230,7 @@ export default function CategoryManagement() {
     setFormData({
       name: category.name,
       description: category.description || '',
-      isActive: category.isActive
+      isActive: category.isActive !== false
     });
     setShowEditModal(true);
   };
@@ -312,74 +301,77 @@ export default function CategoryManagement() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredCategories.map((category) => (
-            <div key={category._id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {category.name}
-                </h3>
-                <div className="flex items-center space-x-2">
-                  <span className={`px-2 py-1 text-xs rounded-full ${
-                    category.isActive
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-                  }`}>
-                    {category.isActive ? 'Aktif' : 'Pasif'}
-                  </span>
+          {filteredCategories.map((category) => {
+            const categoryKey = category.id || category._id || `category-${Math.random()}`;
+            return (
+              <div key={categoryKey} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {category.name}
+                  </h3>
+                  <div className="flex items-center space-x-2">
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      category.isActive
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                    }`}>
+                      {category.isActive ? 'Aktif' : 'Pasif'}
+                    </span>
+                  </div>
+                </div>
+
+                {category.description && (
+                  <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+                    {category.description}
+                  </p>
+                )}
+
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                  Oluşturulma: {new Date(category.createdDate || category.createdAt || Date.now()).toLocaleDateString('tr-TR')}
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <button
+                    onClick={() => toggleCategoryStatus(category.id || category._id || '', !category.isActive)}
+                    className={`flex items-center px-3 py-1 text-sm rounded ${
+                      category.isActive
+                        ? 'text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300'
+                        : 'text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300'
+                    }`}
+                  >
+                    {category.isActive ? (
+                      <>
+                        <FiX className="w-4 h-4 mr-1" />
+                        Pasif Yap
+                      </>
+                    ) : (
+                      <>
+                        <FiCheck className="w-4 h-4 mr-1" />
+                        Aktif Yap
+                      </>
+                    )}
+                  </button>
+
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => openEditModal(category)}
+                      className="flex items-center px-3 py-1 text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                    >
+                      <FiEdit className="w-4 h-4 mr-1" />
+                      Düzenle
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCategory(category.id || category._id || '')}
+                      className="flex items-center px-3 py-1 text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                    >
+                      <FiTrash2 className="w-4 h-4 mr-1" />
+                      Sil
+                    </button>
+                  </div>
                 </div>
               </div>
-
-              {category.description && (
-                <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
-                  {category.description}
-                </p>
-              )}
-
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                Oluşturulma: {new Date(category.createdAt).toLocaleDateString('tr-TR')}
-              </div>
-
-              <div className="flex justify-between items-center">
-                <button
-                  onClick={() => toggleCategoryStatus(category.id || category._id || '', !category.isActive)}
-                  className={`flex items-center px-3 py-1 text-sm rounded ${
-                    category.isActive
-                      ? 'text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300'
-                      : 'text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300'
-                  }`}
-                >
-                  {category.isActive ? (
-                    <>
-                      <FiX className="w-4 h-4 mr-1" />
-                      Pasif Yap
-                    </>
-                  ) : (
-                    <>
-                      <FiCheck className="w-4 h-4 mr-1" />
-                      Aktif Yap
-                    </>
-                  )}
-                </button>
-
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => openEditModal(category)}
-                    className="flex items-center px-3 py-1 text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                  >
-                    <FiEdit className="w-4 h-4 mr-1" />
-                    Düzenle
-                  </button>
-                  <button
-                    onClick={() => handleDeleteCategory(category.id || category._id || '')}
-                    className="flex items-center px-3 py-1 text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                  >
-                    <FiTrash2 className="w-4 h-4 mr-1" />
-                    Sil
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -513,5 +505,7 @@ export default function CategoryManagement() {
         </div>
       )}
     </div>
-  )
+  );
 }
+
+export default CategoryManagement;

@@ -23,6 +23,7 @@ public interface IApplicationDbContext
 
     // User DbSet'leri
     DbSet<User> Users { get; }
+    DbSet<ApplicationUser> ApplicationUsers { get; }
 
     // Müşteri DbSet'leri
     DbSet<BireyselMusteri> BireyselMusteriler { get; }
@@ -31,6 +32,12 @@ public interface IApplicationDbContext
     // Order DbSet'leri
     DbSet<Order> Orders { get; }
     DbSet<OrderItem> OrderItems { get; }
+
+    // Site Settings
+    DbSet<SiteSetting> SiteSettings { get; }
+
+    // Bid DbSet'i
+    DbSet<Bid> Bids { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

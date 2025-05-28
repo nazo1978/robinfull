@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { FiEdit, FiEye, FiSearch, FiRefreshCw, FiPlus, FiTrash2 } from 'react-icons/fi'
+import { FiEdit, FiEye, FiSearch, FiRefreshCw, FiPlus, FiTrash2, FiClock } from 'react-icons/fi'
 import Link from 'next/link'
 import Image from 'next/image'
 import SafeImage from '@/components/SafeImage'
@@ -15,19 +15,28 @@ interface ProductImage {
 
 interface Auction {
   _id: string
+  id?: string // PostgreSQL için
   productId: {
     _id: string
     name: string
     images: (string | ProductImage)[]
+  } | null
+  product?: { // PostgreSQL formatı
+    id: string
+    name: string
+    imageUrl: string
+    description: string
+    categoryName: string
   }
   startPrice: number
   currentPrice: number
-  reservePrice: number
+  reservePrice?: number
   minIncrement: number
   startTime: string
   endTime: string
   status: string
-  bidCount: number
+  bidCount?: number
+  bids?: any[]
   highestBidder?: {
     name: string
     email: string
@@ -70,7 +79,7 @@ export default function AuctionManagement() {
         }
       }
 
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5128';
       const response = await fetch(`${apiBaseUrl}/api/auctions`, {
         headers: {
           'Content-Type': 'application/json',
@@ -79,7 +88,32 @@ export default function AuctionManagement() {
       })
       if (!response.ok) throw new Error('Açık artırmalar getirilemedi')
       const data = await response.json()
-      setAuctions(data.auctions || [])
+      console.log('Açık artırma API yanıtı:', data)
+
+      // PostgreSQL API'sinden gelen veriyi MongoDB formatına çevir
+      let auctions = []
+      if (data.success && data.auctions) {
+        auctions = data.auctions.map((auction: any) => ({
+          _id: auction.id,
+          productId: auction.product ? {
+            _id: auction.product.id,
+            name: auction.product.name,
+            images: auction.product.imageUrl ? [auction.product.imageUrl] : []
+          } : null,
+          startPrice: auction.startPrice,
+          currentPrice: auction.currentPrice,
+          minIncrement: auction.minIncrement,
+          startTime: auction.startTime,
+          endTime: auction.endTime,
+          status: auction.status,
+          bidCount: auction.bids ? auction.bids.length : 0,
+          bids: auction.bids || [],
+          highestBidder: auction.highestBidder
+        }))
+      }
+
+      console.log('Formatlanmış açık artırmalar:', auctions)
+      setAuctions(auctions)
     } catch (error) {
       console.error('Açık artırmaları getirme hatası:', error)
       setError('Açık artırmalar yüklenirken bir hata oluştu')
@@ -131,7 +165,7 @@ export default function AuctionManagement() {
 
       console.log('Açık artırma oluşturma verileri:', formattedData);
 
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5128';
       const response = await fetch(`${apiBaseUrl}/api/auctions`, {
         method: 'POST',
         headers: {
@@ -187,6 +221,17 @@ export default function AuctionManagement() {
         }
       }
 
+      // Tarih formatını düzelt
+      const formattedData = {
+        startPrice: auctionData.startPrice,
+        minIncrement: auctionData.minIncrement,
+        startTime: new Date(auctionData.startTime).toISOString(),
+        endTime: new Date(auctionData.endTime).toISOString(),
+        description: auctionData.description
+      };
+
+      console.log('Açık artırma güncelleme verileri:', formattedData);
+
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
       const response = await fetch(`${apiBaseUrl}/api/auctions/${selectedAuction._id}`, {
         method: 'PUT',
@@ -194,13 +239,30 @@ export default function AuctionManagement() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(auctionData),
+        body: JSON.stringify(formattedData),
       })
 
-      const data = await response.json()
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
 
       if (!response.ok) {
-        throw new Error(data.message || 'Açık artırma güncellenirken bir hata oluştu')
+        // Eğer response JSON değilse text olarak oku
+        let errorMessage;
+        try {
+          const data = await response.json();
+          errorMessage = data.message || 'Açık artırma güncellenirken bir hata oluştu';
+        } catch {
+          const text = await response.text();
+          errorMessage = `HTTP ${response.status}: ${text || 'Bilinmeyen hata'}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log('Açık artırma güncelleme yanıtı:', data);
+
+      if (!data.success) {
+        throw new Error(data.message || 'Açık artırma güncellenirken bir hata oluştu');
       }
 
       setSuccess('Açık artırma başarıyla güncellendi')
@@ -212,6 +274,59 @@ export default function AuctionManagement() {
     } catch (err: any) {
       console.error('Açık artırma güncelleme hatası:', err)
       setError(err.message || 'Açık artırma güncellenirken bir hata oluştu')
+    }
+  }
+
+  const handleUpdateStatuses = async () => {
+    try {
+      // Token'ı cookie'den al
+      let token = '';
+
+      const authTokenCookie = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('authToken='));
+
+      if (authTokenCookie) {
+        token = authTokenCookie.split('=')[1];
+      } else {
+        const adminTokenCookie = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('adminToken='));
+
+        if (adminTokenCookie) {
+          token = adminTokenCookie.split('=')[1];
+        }
+      }
+
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5128';
+      const response = await fetch(`${apiBaseUrl}/api/auctions/update-statuses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Durumlar güncellenirken bir hata oluştu')
+      }
+
+      const data = await response.json()
+      console.log('Status güncelleme yanıtı:', data);
+
+      if (!data.success) {
+        throw new Error(data.message || 'Durumlar güncellenirken bir hata oluştu');
+      }
+
+      setSuccess(`${data.pendingToActive || 0} açık artırma aktif, ${data.activeToEnded || 0} açık artırma sona erdirildi`)
+      fetchAuctions() // Listeyi yenile
+
+      // 5 saniye sonra başarı mesajını temizle
+      setTimeout(() => setSuccess(null), 5000)
+    } catch (err: any) {
+      console.error('Status güncelleme hatası:', err)
+      setError(err.message || 'Durumlar güncellenirken bir hata oluştu')
     }
   }
 
@@ -238,7 +353,7 @@ export default function AuctionManagement() {
         }
       }
 
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5128';
       const response = await fetch(`${apiBaseUrl}/api/auctions/${selectedAuction._id}`, {
         method: 'DELETE',
         headers: {
@@ -247,8 +362,9 @@ export default function AuctionManagement() {
         },
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const data = await response.json()
         throw new Error(data.message || 'Açık artırma silinirken bir hata oluştu')
       }
 
@@ -350,6 +466,14 @@ export default function AuctionManagement() {
             <option value="ended">Tamamlandı</option>
             <option value="cancelled">İptal Edildi</option>
           </select>
+
+          <button
+            onClick={handleUpdateStatuses}
+            className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            <FiClock className="mr-2" />
+            Durumları Güncelle
+          </button>
 
           <button
             onClick={() => setShowCreateModal(true)}

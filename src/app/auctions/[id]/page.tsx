@@ -51,10 +51,39 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
     const fetchAuction = async () => {
       setIsLoading(true)
       try {
-        const response = await fetch(`/api/auctions/${resolvedParams.id}`)
+        const response = await fetch(`http://localhost:5128/api/auctions/${resolvedParams.id}`)
         if (!response.ok) throw new Error('Açık artırma detayları yüklenirken bir hata oluştu')
         const data = await response.json()
-        setAuction(data.auction)
+        console.log('Açık artırma detay verisi:', data)
+
+        // PostgreSQL'den gelen veriyi MongoDB formatına çevir
+        let formattedAuction = null
+        if (data.success && data.auction) {
+          formattedAuction = {
+            _id: data.auction.id,
+            productId: {
+              _id: data.auction.product?.id || data.auction.productId,
+              name: data.auction.product?.name || 'İsimsiz Ürün',
+              images: data.auction.product?.imageUrl ? [data.auction.product.imageUrl] : [],
+              description: data.auction.product?.description || '',
+              category: data.auction.product?.categoryName || 'Diğer'
+            },
+            startPrice: data.auction.startPrice,
+            currentPrice: data.auction.currentPrice,
+            minIncrement: data.auction.minIncrement,
+            startTime: data.auction.startTime,
+            endTime: data.auction.endTime,
+            status: data.auction.status,
+            bids: data.auction.bids || [],
+            highestBidder: data.auction.highestBidder ? {
+              _id: data.auction.highestBidder.id,
+              name: data.auction.highestBidder.username || data.auction.highestBidder.name
+            } : null
+          }
+        }
+
+        console.log('Formatlanmış açık artırma:', formattedAuction)
+        setAuction(formattedAuction)
 
         // Minimum teklif miktarını ayarla
         if (data.auction) {
@@ -119,7 +148,33 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
   const handleBidSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!user) {
+    // Token kontrolü yap
+    let token = '';
+    const authTokenCookie = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('authToken='));
+
+    if (authTokenCookie) {
+      token = authTokenCookie.split('=')[1];
+    } else {
+      const adminTokenCookie = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('adminToken='));
+
+      if (adminTokenCookie) {
+        token = adminTokenCookie.split('=')[1];
+      }
+    }
+
+    console.log('Token kontrolü:', {
+      authToken: authTokenCookie ? 'Var' : 'Yok',
+      adminToken: document.cookie.includes('adminToken=') ? 'Var' : 'Yok',
+      finalToken: token ? `${token.substring(0, 20)}...` : 'Yok',
+      allCookies: document.cookie
+    });
+
+    if (!token) {
+      console.log('Token bulunamadı, giriş sayfasına yönlendiriliyor');
       router.push('/auth/login?redirect=' + encodeURIComponent(`/auctions/${resolvedParams.id}`))
       return
     }
@@ -144,16 +199,29 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
 
     try {
       // Token'ı cookie'den al
+      let token = '';
+
       const authTokenCookie = document.cookie
         .split('; ')
         .find(row => row.startsWith('authToken='));
 
-      const token = authTokenCookie ? authTokenCookie.split('=')[1] : '';
+      if (authTokenCookie) {
+        token = authTokenCookie.split('=')[1];
+      } else {
+        // Admin token'ını kontrol et
+        const adminTokenCookie = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('adminToken='));
+
+        if (adminTokenCookie) {
+          token = adminTokenCookie.split('=')[1];
+        }
+      }
 
       console.log('Cookie\'den alınan token:', token ? `${token.substring(0, 20)}...` : 'Token yok');
       console.log('Tüm cookie\'ler:', document.cookie);
 
-      const response = await fetch(`/api/auctions/${resolvedParams.id}/bid`, {
+      const response = await fetch(`http://localhost:5128/api/auctions/${resolvedParams.id}/bid`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -173,9 +241,35 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
       setSuccessMessage('Teklifiniz başarıyla kaydedildi!')
 
       // Açık artırma verilerini yenile
-      const auctionResponse = await fetch(`/api/auctions/${resolvedParams.id}`)
+      const auctionResponse = await fetch(`http://localhost:5128/api/auctions/${resolvedParams.id}`)
       const auctionData = await auctionResponse.json()
-      setAuction(auctionData.auction)
+
+      // Yenilenen veriyi de formatla
+      let refreshedAuction = null
+      if (auctionData.success && auctionData.auction) {
+        refreshedAuction = {
+          _id: auctionData.auction.id,
+          productId: {
+            _id: auctionData.auction.product?.id || auctionData.auction.productId,
+            name: auctionData.auction.product?.name || 'İsimsiz Ürün',
+            images: auctionData.auction.product?.imageUrl ? [auctionData.auction.product.imageUrl] : [],
+            description: auctionData.auction.product?.description || '',
+            category: auctionData.auction.product?.categoryName || 'Diğer'
+          },
+          startPrice: auctionData.auction.startPrice,
+          currentPrice: auctionData.auction.currentPrice,
+          minIncrement: auctionData.auction.minIncrement,
+          startTime: auctionData.auction.startTime,
+          endTime: auctionData.auction.endTime,
+          status: auctionData.auction.status,
+          bids: auctionData.auction.bids || [],
+          highestBidder: auctionData.auction.highestBidder ? {
+            _id: auctionData.auction.highestBidder.id,
+            name: auctionData.auction.highestBidder.username || auctionData.auction.highestBidder.name
+          } : null
+        }
+      }
+      setAuction(refreshedAuction)
 
       // Minimum teklif miktarını güncelle
       if (auctionData.auction) {
@@ -428,9 +522,9 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                     <button
                       type="submit"
-                      disabled={isSubmitting || !user}
+                      disabled={isSubmitting}
                       className={`w-full py-3 px-4 rounded-lg font-medium transition-colors flex justify-center items-center ${
-                        (isSubmitting || !user)
+                        isSubmitting
                           ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
                           : 'bg-gray-700 hover:bg-gray-600 text-white dark:bg-gray-600 dark:hover:bg-gray-500'
                       }`}
@@ -440,8 +534,6 @@ export default function AuctionDetailPage({ params }: { params: Promise<{ id: st
                           <span className="animate-spin h-5 w-5 mr-3 border-t-2 border-b-2 border-white rounded-full"></span>
                           İşleniyor...
                         </>
-                      ) : !user ? (
-                        'Teklif vermek için giriş yapın'
                       ) : (
                         'Teklif Ver'
                       )}
